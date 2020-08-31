@@ -25,11 +25,11 @@ const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder()
 
 
 
-const run = async (config) => {
+const run = async (config, start_block = 'latest') => {
     console.log(`Starting ETH watcher for EOS oracle ${config.eos.oracleAccount}`);
 
     contract.events.Teleport({
-        fromBlock: 0
+        fromBlock: start_block
     })
         .on('data', async function(event){
             const to = event.returnValues.to
@@ -65,6 +65,25 @@ const run = async (config) => {
             }
         })
         .on('error', console.error);
-}
+};
 
-run(config);
+let start_block = 'latest';
+if (process.argv[2]){
+    const lb = parseInt(process.argv[2]);
+    if (isNaN(lb)){
+        console.error(`You must supply start block as an integer on command line`);
+        process.exit(1);
+    }
+    start_block = lb;
+}
+else if (process.env['START_BLOCK']){
+    const lb = parseInt(process.env['START_BLOCK']);
+    if (isNaN(lb)){
+        console.error(`You must supply start block as an integer in env`);
+        process.exit(1);
+    }
+    start_block = lb;
+}
+console.log(`Starting from block ${start_block}`);
+
+run(config, start_block);

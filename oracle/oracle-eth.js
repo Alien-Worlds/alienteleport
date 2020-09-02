@@ -58,7 +58,7 @@ const run = async (config, start_block = 'latest') => {
                     blocksBehind: 3,
                     expireSeconds: 30,
                 });
-                console.log(`Sent with txid ${res.transaction_id}`);
+                console.log(`Sent confirmation with txid ${res.transaction_id}`);
             }
             catch (e){
                 console.error(`Error pushing confirmation ${e.message}`);

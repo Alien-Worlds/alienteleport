@@ -40,7 +40,7 @@ const run = async (config, start_block = 'latest') => {
             // receive(name oracle_name, name to, checksum256 ref, asset quantity)
             const actions = [{
                 account: config.eos.teleportContract,
-                name: 'receive',
+                name: 'received',
                 authorization: [{
                     actor: config.eos.oracleAccount,
                     permission: 'active'

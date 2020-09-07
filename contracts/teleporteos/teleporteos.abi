@@ -92,7 +92,7 @@
             ]
         },
         {
-            "name": "receive",
+            "name": "received",
             "base": "",
             "fields": [
                 {
@@ -149,8 +149,8 @@
             "ricardian_contract": ""
         },
         {
-            "name": "receive",
-            "type": "receive",
+            "name": "received",
+            "type": "received",
             "ricardian_contract": ""
         },
         {

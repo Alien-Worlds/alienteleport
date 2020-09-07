@@ -43,7 +43,7 @@ void teleporteos::teleport(name from, asset quantity, string eth_address) {
     _deposits.erase(deposit);
 }
 
-void teleporteos::receive(name oracle_name, name to, checksum256 ref, asset quantity) {
+void teleporteos::received(name oracle_name, name to, checksum256 ref, asset quantity) {
     require_oracle(oracle_name);
 
     // check it has not already been completed

@@ -86,6 +86,7 @@ contract Owned {
 
 contract Oracled is Owned {
     address[] public oracles;
+    uint public maxOracles = 50;
 
     modifier onlyOracle {
         bool haveAddress = false;
@@ -112,6 +113,8 @@ contract Oracled is Owned {
             }
         }
         if (!emplaced){
+            require(oracles.length < maxOracles, "Registering oracle would exceed maximum");
+
             oracles.push(_newOracle);
         }
     }

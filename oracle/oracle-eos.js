@@ -4,7 +4,7 @@
 This oracle listens to the EOSIO chain for teleport actions using a state history node
 
 After receiving a teleport action, it will send notification to the ETH blockchain, after 3 similar oracles have
-sent the `receive` action to the ethereum contract, the ethereum contract will transfer the tokens to the account
+sent the `received` action to the ethereum contract, the ethereum contract will transfer the tokens to the account
 specified in the EOSIO `teleport` action.
  */
 
@@ -45,7 +45,7 @@ class TraceHandler {
         const address = ethUtil.toChecksumAddress(`0x${addr}`);
         const contract = new web3.eth.Contract(ethAbi, this.config.eth.teleportContract);
 
-        const data = contract.methods.receive(to, web3.eth.abi.encodeParameter('uint256', '0x' + tx_id), amount).encodeABI();
+        const data = contract.methods.received(to, web3.eth.abi.encodeParameter('uint256', '0x' + tx_id), amount).encodeABI();
 
         const tx = {
             from: address,

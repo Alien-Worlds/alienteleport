@@ -100,7 +100,26 @@ contract Oracled is Owned {
     }
 
     function regOracle(address _newOracle) public onlyOwner {
-        oracles.push(_newOracle);
+        bool emplaced = false;
+        for (uint i=0; i<oracles.length; i++){
+            if (oracles[i] == 0x0000000000000000000000000000000000000000){
+                oracles[i] = _newOracle;
+                emplaced = true;
+                break;
+            }
+        }
+        if (!emplaced){
+            oracles.push(_newOracle);
+        }
+    }
+
+    function unregOracle(address _remOracle) public onlyOwner {
+        for (uint i=0; i<oracles.length; i++){
+            if (oracles[i] == _remOracle){
+                delete oracles[i];
+                break;
+            }
+        }
     }
 }
 

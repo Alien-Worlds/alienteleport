@@ -8,6 +8,8 @@ sent the `received` action to the ethereum contract, the ethereum contract will 
 specified in the EOSIO `teleport` action.
  */
 
+process.title = `oracle-eos ${process.env['CONFIG']}`;
+
 const StateReceiver = require('@eosdacio/eosio-statereceiver');
 const {Api, JsonRpc, Serialize} = require('eosjs');
 const { JsSignatureProvider } = require('eosjs/dist/eosjs-jssig');

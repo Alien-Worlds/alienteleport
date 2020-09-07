@@ -5,6 +5,9 @@ This oracle listens to the ethereum blockchain for `Teleport` events.
 
 When an event is received, it will
  */
+
+process.title = `oracle-eth ${process.env['CONFIG']}`;
+
 const {Api, JsonRpc} = require('eosjs');
 const {TextDecoder, TextEncoder} = require('text-encoding');
 const Web3 = require('web3');

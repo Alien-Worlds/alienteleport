@@ -140,6 +140,7 @@ contract TeleportToken is ERC20Interface, Owned, Oracled {
     string public  name;
     uint8 public decimals;
     uint public _totalSupply;
+    uint public threshold;
 
     mapping(address => uint) balances;
     mapping(uint256 => mapping(address => uint)) public requests;  // number of oracles who have approved this request
@@ -159,6 +160,7 @@ contract TeleportToken is ERC20Interface, Owned, Oracled {
         decimals = 4;
         _totalSupply = 1000000000 * 10**uint(decimals);
         balances[address(0)] = _totalSupply;
+        threshold = 3;
     }
 
 
@@ -270,7 +272,7 @@ contract TeleportToken is ERC20Interface, Owned, Oracled {
     function received(address to, uint256 ref, uint tokens) public onlyOracle returns (bool success) {
         requests[ref][to]++;
 
-        if (requests[ref][to] >= 3 && !completed[ref]){  // 3 confirmations required
+        if (requests[ref][to] >= threshold && !completed[ref]){  // 3 confirmations required
             balances[address(0)] = balances[address(0)].sub(tokens);
             balances[to] = balances[to].add(tokens);
             delete requests[ref][to];
@@ -282,6 +284,16 @@ contract TeleportToken is ERC20Interface, Owned, Oracled {
         }
 
         return true;
+    }
+
+    function updateThreshold(uint newThreshold) public onlyOwner returns (bool success) {
+        if (newThreshold > 0){
+            threshold = newThreshold;
+
+            return true;
+        }
+
+        return false;
     }
 
     // ------------------------------------------------------------------------

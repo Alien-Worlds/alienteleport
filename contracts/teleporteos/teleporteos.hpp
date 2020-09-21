@@ -73,7 +73,8 @@ namespace alienworlds {
 
         [[eosio::action]] void teleport(name from, asset quantity, string eth_address);
         [[eosio::action]] void received(name oracle_name, name to, checksum256 ref, asset quantity);
-        [[eosio::action]] void addoracle(name oracle_name);
+        [[eosio::action]] void regoracle(name oracle_name);
+        [[eosio::action]] void unregoracle(name oracle_name);
         [[eosio::action]] void delreceipts();
         [[eosio::action]] void delcomps();
     };

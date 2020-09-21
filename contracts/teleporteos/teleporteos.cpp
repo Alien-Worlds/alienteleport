@@ -97,14 +97,23 @@ void teleporteos::received(name oracle_name, name to, checksum256 ref, asset qua
     }
 }
 
-void teleporteos::addoracle(name oracle_name) {
+void teleporteos::regoracle(name oracle_name) {
     require_auth(get_self());
 
     check(is_account(oracle_name), "Oracle account does not exist");
 
     _oracles.emplace(get_self(), [&](auto &o){
-        o.account = oracle_name;
+      o.account = oracle_name;
     });
+}
+
+void teleporteos::unregoracle(name oracle_name) {
+    require_auth(get_self());
+
+    auto oracle = _oracles.find(oracle_name.value);
+    check(oracle != _oracles.end(), "Oracle does not exist");
+
+    _oracles.erase(oracle);
 }
 
 

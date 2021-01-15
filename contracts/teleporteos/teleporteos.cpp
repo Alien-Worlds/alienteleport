@@ -6,7 +6,8 @@ teleporteos::teleporteos(name s, name code, datastream<const char *> ds) : contr
                                                                            _deposits(get_self(), get_self().value),
                                                                            _oracles(get_self(), get_self().value),
                                                                            _receipts(get_self(), get_self().value),
-                                                                           _completions(get_self(), get_self().value) {}
+                                                                           _completions(get_self(), get_self().value),
+                                                                           _teleports(get_self(), get_self().value) {}
 
 /* Notifications for tlm transfer */
 void teleporteos::transfer(name from, name to, asset quantity, string memo) {
@@ -28,7 +29,31 @@ void teleporteos::transfer(name from, name to, asset quantity, string memo) {
     }
 }
 
-void teleporteos::teleport(name from, asset quantity, string eth_address) {
+void teleporteos::withdraw(name account, asset quantity) {
+    require_auth(account);
+
+    auto deposit = _deposits.find(account.value);
+    check(deposit != _deposits.end(), "Deposit not found, please transfer the tokens first");
+    check(deposit->quantity >= quantity, "Withdraw amount exceeds deposit");
+
+    if (deposit->quantity == quantity){
+        _deposits.erase(deposit);
+    }
+    else {
+        _deposits.modify(*deposit, same_payer, [&](auto &d){
+            d.quantity -= quantity;
+        });
+    }
+
+    string memo = "Return of deposit";
+    action(
+        permission_level{get_self(), "active"_n},
+        TOKEN_CONTRACT, "transfer"_n,
+        make_tuple(get_self(), account, quantity, memo)
+    ).send();
+}
+
+void teleporteos::teleport(name from, asset quantity, uint8_t chain_id, string eth_address) {
     require_auth(from);
 
     check(quantity.is_valid(), "Amount is not valid");
@@ -38,9 +63,56 @@ void teleporteos::teleport(name from, asset quantity, string eth_address) {
 
     auto deposit = _deposits.find(from.value);
     check(deposit != _deposits.end(), "Deposit not found, please transfer the tokens first");
+    check(deposit->quantity >= quantity, "Not enough deposited");
 
     // tokens owned by this contract are inaccessible so just remove the deposit record
-    _deposits.erase(deposit);
+    if (deposit->quantity == quantity){
+        _deposits.erase(deposit);
+    }
+    else {
+        _deposits.modify(*deposit, same_payer, [&](auto &d){
+            d.quantity -= quantity;
+        });
+    }
+
+    uint64_t next_teleport_id = _teleports.available_primary_key();
+    uint32_t now = current_time_point().sec_since_epoch();
+    _teleports.emplace(from, [&](auto &t){
+        t.id = next_teleport_id;
+        t.time = now;
+        t.account = from;
+        t.quantity = quantity;
+        t.chain_id = chain_id;
+        t.eth_address = eth_address;
+    });
+
+    action(
+        permission_level{get_self(), "active"_n},
+        get_self(), "logteleport"_n,
+        make_tuple(next_teleport_id, now, from, quantity, chain_id, eth_address)
+    ).send();
+}
+
+void teleporteos::logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity, uint8_t chain_id, string eth_address) {
+    // Logs the teleport id for the oracle to listen to
+    require_auth(get_self());
+}
+
+void teleporteos::sign(name oracle_name, uint64_t id, string signature) {
+    // Signs receipt of tokens, these signatures must be passed to the eth blockchain
+    // in the claim function on the eth contract
+    require_oracle(oracle_name);
+
+    auto teleport = _teleports.find(id);
+    check(teleport != _teleports.end(), "Teleport not found");
+
+    auto find_res = std::find(teleport->oracles.begin(), teleport->oracles.end(), oracle_name);
+    check(find_res == teleport->oracles.end(), "Oracle has already signed");
+
+    _teleports.modify(*teleport, get_self(), [&](auto &t){
+        t.oracles.push_back(oracle_name);
+        t.signatures.push_back(signature);
+    });
 }
 
 void teleporteos::received(name oracle_name, name to, checksum256 ref, asset quantity) {
@@ -131,12 +203,22 @@ void teleporteos::delcomps() {
 
     auto comp = _completions.begin();
     while (comp != _completions.end()) {
-      comp = _completions.erase(comp);
+        comp = _completions.erase(comp);
+    }
+}
+
+void teleporteos::delteles() {
+    require_auth(get_self());
+
+    auto tp = _teleports.begin();
+    while (tp != _teleports.end()) {
+        tp = _teleports.erase(tp);
     }
 }
 
 /* Private */
 
 void teleporteos::require_oracle(name account) {
+    require_auth(account);
     _oracles.get(account.value, "Account is not an oracle");
 }

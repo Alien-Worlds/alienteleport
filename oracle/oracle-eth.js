@@ -3,7 +3,7 @@
 /*
 This oracle listens to the ethereum blockchain for `Teleport` events.
 
-When an event is received, it will
+When an event is received, it will call the `received` action on the EOS chain
  */
 
 process.title = `oracle-eth ${process.env['CONFIG']}`;

@@ -57,7 +57,8 @@ class TraceHandler {
 
         // sign the transaction and send to the eos chain
         const data_buf = Buffer.from(data_serialized);
-        const msg_hash = ethUtil.hashPersonalMessage(data_buf);
+        const msg_hash = ethUtil.keccak(data_buf);
+        console.log(msg_hash.toString('hex'));
         // console.log(this.config.eth.privateKey);
         const pk = Buffer.from(this.config.eth.privateKey, "hex");
         const sig = ethUtil.ecsign(msg_hash, pk);
@@ -100,7 +101,7 @@ class TraceHandler {
         /*var sigDecoded = ethUtil.fromRpcSig(signature)
         var recoveredPub = ethUtil.ecrecover(msg_hash, sigDecoded.v, sigDecoded.r, sigDecoded.s)
         var recoveredAddress = ethUtil.pubToAddress(recoveredPub).toString("hex")
-        console.log(recoveredPub, recoveredAddress);*/
+        console.log(sigDecoded, recoveredPub.toString('hex'), recoveredAddress);*/
     }
 
     async processTrace(block_num, traces, block_timestamp) {

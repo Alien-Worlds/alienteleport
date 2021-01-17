@@ -72,7 +72,7 @@
                 },
                 {
                     "name": "eth_address",
-                    "type": "string"
+                    "type": "checksum256"
                 }
             ]
         },
@@ -184,7 +184,7 @@
                 },
                 {
                     "name": "eth_address",
-                    "type": "string"
+                    "type": "checksum256"
                 }
             ]
         },
@@ -214,7 +214,7 @@
                 },
                 {
                     "name": "eth_address",
-                    "type": "string"
+                    "type": "checksum256"
                 },
                 {
                     "name": "oracles",
@@ -223,6 +223,10 @@
                 {
                     "name": "signatures",
                     "type": "string[]"
+                },
+                {
+                    "name": "claimed",
+                    "type": "bool"
                 }
             ]
         },

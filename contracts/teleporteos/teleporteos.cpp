@@ -53,7 +53,7 @@ void teleporteos::withdraw(name account, asset quantity) {
     ).send();
 }
 
-void teleporteos::teleport(name from, asset quantity, uint8_t chain_id, string eth_address) {
+void teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checksum256 eth_address) {
     require_auth(from);
 
     check(quantity.is_valid(), "Amount is not valid");
@@ -84,6 +84,7 @@ void teleporteos::teleport(name from, asset quantity, uint8_t chain_id, string e
         t.quantity = quantity;
         t.chain_id = chain_id;
         t.eth_address = eth_address;
+        t.claimed = false;
     });
 
     action(
@@ -93,7 +94,7 @@ void teleporteos::teleport(name from, asset quantity, uint8_t chain_id, string e
     ).send();
 }
 
-void teleporteos::logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity, uint8_t chain_id, string eth_address) {
+void teleporteos::logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity, uint8_t chain_id, checksum256 eth_address) {
     // Logs the teleport id for the oracle to listen to
     require_auth(get_self());
 }

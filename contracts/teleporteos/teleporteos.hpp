@@ -30,9 +30,10 @@ namespace alienworlds {
             name           account;
             asset          quantity;
             int8_t         chain_id;
-            string         eth_address;
+            checksum256    eth_address;
             vector<name>   oracles;
             vector<string> signatures;
+            bool           claimed;
 
             uint64_t primary_key() const { return id; }
             uint64_t by_account() const { return account.value; }
@@ -92,8 +93,8 @@ namespace alienworlds {
         /* Fungible token transfer (only trilium) */
         [[eosio::on_notify(TOKEN_CONTRACT_STR "::transfer")]] void transfer(name from, name to, asset quantity, string memo);
 
-        [[eosio::action]] void teleport(name from, asset quantity, uint8_t chain_id, string eth_address);
-        [[eosio::action]] void logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity, uint8_t chain_id, string eth_address);
+        [[eosio::action]] void teleport(name from, asset quantity, uint8_t chain_id, checksum256 eth_address);
+        [[eosio::action]] void logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity, uint8_t chain_id, checksum256 eth_address);
         [[eosio::action]] void sign(name oracle_name, uint64_t id, string signature);
         [[eosio::action]] void withdraw(name from, asset quantity);
         [[eosio::action]] void received(name oracle_name, name to, checksum256 ref, asset quantity);

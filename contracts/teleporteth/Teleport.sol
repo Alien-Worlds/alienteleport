@@ -2,8 +2,92 @@ pragma solidity ^0.6.12;
 /*
  * SPDX-License-Identifier: MIT
  */
+pragma experimental "ABIEncoderV2";
 
 
+library Verify { 
+
+  function recoverSigner(bytes32 message, bytes memory sig)
+       public
+       pure
+       returns (address)
+    {
+       uint8 v;
+       bytes32 r;
+       bytes32 s;
+
+       (v, r, s) = splitSignature(sig);
+       
+       if (v != 27 && v != 28) {
+           return (address(0));
+       } else {
+           // solium-disable-next-line arg-overflow
+           return ecrecover(message, v, r, s);
+       }
+  }
+
+  function splitSignature(bytes memory sig)
+       public
+       pure
+       returns (uint8, bytes32, bytes32)
+   {
+       require(sig.length == 65);
+       
+       bytes32 r;
+       bytes32 s;
+       uint8 v;
+
+       assembly {
+           // first 32 bytes, after the length prefix
+           r := mload(add(sig, 32))
+           // second 32 bytes
+           s := mload(add(sig, 64))
+           // final byte (first byte of the next 32 bytes)
+           v := byte(0, mload(add(sig, 96)))
+       }
+       
+       if (v < 27) 
+           v += 27;
+
+       return (v, r, s);
+   }
+}
+
+
+library Endian {
+    /* https://ethereum.stackexchange.com/questions/83626/how-to-reverse-byte-order-in-uint256-or-bytes32 */
+    function reverse64(uint64 input) internal pure returns (uint64 v) {
+        v = input;
+    
+        // swap bytes
+        v = ((v & 0xFF00FF00FF00FF00) >> 8) |
+            ((v & 0x00FF00FF00FF00FF) << 8);
+    
+        // swap 2-byte long pairs
+        v = ((v & 0xFFFF0000FFFF0000) >> 16) |
+            ((v & 0x0000FFFF0000FFFF) << 16);
+    
+        // swap 4-byte long pairs
+        v = (v >> 32) | (v << 32);
+    }
+    function reverse32(uint32 input) internal pure returns (uint32 v) {
+        v = input;
+    
+        // swap bytes
+        v = ((v & 0xFF00FF00) >> 8) |
+            ((v & 0x00FF00FF) << 8);
+    
+        // swap 2-byte long pairs
+        v = (v >> 16) | (v << 16);
+    }
+    function reverse16(uint16 input) internal pure returns (uint16 v) {
+        v = input;
+    
+        // swap bytes
+        v = (v >> 8) | (v << 8);
+    }
+}
+    
 // ----------------------------------------------------------------------------
 // Safe maths
 // ----------------------------------------------------------------------------
@@ -75,6 +159,7 @@ contract Owned {
     function transferOwnership(address _newOwner) public onlyOwner {
         newOwner = _newOwner;
     }
+
     function acceptOwnership() public {
         require(msg.sender == newOwner);
         emit OwnershipTransferred(owner, newOwner);
@@ -85,47 +170,24 @@ contract Owned {
 
 
 contract Oracled is Owned {
-    address[] public oracles;
-    uint public maxOracles = 50;
+    mapping(address => bool) public oracles;
 
     modifier onlyOracle {
-        bool haveAddress = false;
-
-        for (uint i=0; i<oracles.length; i++){
-            if (oracles[i] == msg.sender){
-                haveAddress = true;
-                break;
-            }
-        }
-
-        require(haveAddress, "Account is not a registered oracle");
+        require(oracles[msg.sender] == true, "Account is not a registered oracle");
 
         _;
     }
 
     function regOracle(address _newOracle) public onlyOwner {
-        bool emplaced = false;
-        for (uint i=0; i<oracles.length; i++){
-            if (oracles[i] == 0x0000000000000000000000000000000000000000){
-                oracles[i] = _newOracle;
-                emplaced = true;
-                break;
-            }
-        }
-        if (!emplaced){
-            require(oracles.length < maxOracles, "Registering oracle would exceed maximum");
-
-            oracles.push(_newOracle);
-        }
+        require(!oracles[_newOracle], "Oracle is already registered");
+        
+        oracles[_newOracle] = true;
     }
 
     function unregOracle(address _remOracle) public onlyOwner {
-        for (uint i=0; i<oracles.length; i++){
-            if (oracles[i] == _remOracle){
-                delete oracles[i];
-                break;
-            }
-        }
+        require(oracles[_remOracle] == true, "Oracle is not registered");
+        
+        delete oracles[_remOracle];
     }
 }
 
@@ -140,17 +202,28 @@ contract TeleportToken is ERC20Interface, Owned, Oracled {
     string public  name;
     uint8 public decimals;
     uint public _totalSupply;
-    uint public threshold;
+    uint8 public threshold;
+    uint8 public thisChainId;
 
     mapping(address => uint) balances;
-    mapping(uint256 => mapping(address => uint)) public requests;  // number of oracles who have approved this request
-    mapping(uint256 => address[]) public approvals;  // addresses of oracles who have approved this request
     mapping(address => mapping(address => uint)) allowed;
-    mapping(uint256 => bool) completed;
+    
+    mapping(uint64 => mapping(address => bool)) signed;
+    mapping(uint64 => bool) public claimed;
 
-    event Teleport(address indexed from, string to, uint tokens);
-    event Received(address to, uint256 ref, uint tokens);
+    event Teleport(address indexed from, string to, uint tokens, uint chainId);
+    event Claimed(uint64 id, address to, uint tokens);
 
+    struct TeleportData {
+        uint64 id;
+        uint32 ts;
+        uint64 fromAddr;
+        uint64 quantity;
+        uint64 symbolRaw;
+        uint8 chainId;
+        address toAddress;
+    }
+    
     // ------------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------------
@@ -161,6 +234,7 @@ contract TeleportToken is ERC20Interface, Owned, Oracled {
         _totalSupply = 1000000000 * 10**uint(decimals);
         balances[address(0)] = _totalSupply;
         threshold = 3;
+        thisChainId = 1;
     }
 
 
@@ -168,7 +242,7 @@ contract TeleportToken is ERC20Interface, Owned, Oracled {
     // Total supply
     // ------------------------------------------------------------------------
     function totalSupply() override public view returns (uint) {
-        return _totalSupply  - balances[address(0)];
+        return _totalSupply - balances[address(0)];
     }
 
 
@@ -253,42 +327,113 @@ contract TeleportToken is ERC20Interface, Owned, Oracled {
     // to monitor and issue on other chain
     // to : EOS address
     // tokens : number of tokens in satoshis
+    // chainId : The chain id that they will be sent to
     // ------------------------------------------------------------------------
 
-    function teleport(string memory to, uint tokens) public returns (bool success) {
+    function teleport(string memory to, uint tokens, uint chainid) public returns (bool success) {
         balances[msg.sender] = balances[msg.sender].sub(tokens);
         balances[address(0)] = balances[address(0)].add(tokens);
-        emit Teleport(msg.sender, to, tokens);
+        emit Teleport(msg.sender, to, tokens, chainid);
 
         return true;
     }
 
 
     // ------------------------------------------------------------------------
-    // Called by the oracles to move tokens from inaccessible to accessible
-    // reference is the txid on the other chain
+    // Claim tokens sent using signatures supplied to the other chain
     // ------------------------------------------------------------------------
 
-    function received(address to, uint256 ref, uint tokens) public onlyOracle returns (bool success) {
-        requests[ref][to]++;
 
-        if (requests[ref][to] >= threshold && !completed[ref]){  // 3 confirmations required
-            balances[address(0)] = balances[address(0)].sub(tokens);
-            balances[to] = balances[to].add(tokens);
-            delete requests[ref][to];
+    function verifySigData(bytes memory sigData) private returns (TeleportData memory) {
+        TeleportData memory td;
+        
+        uint64 id;
+        uint32 ts;
+        uint64 fromAddr;
+        uint64 quantity;
+        uint64 symbolRaw;
+        uint8 chainId;
+        address toAddress;
+        
+        assembly {
+            id := mload(add(add(sigData, 0x8), 0))
+            ts := mload(add(add(sigData, 0x4), 8))
+            fromAddr := mload(add(add(sigData, 0x8), 12))
+            quantity := mload(add(add(sigData, 0x8), 20))
+            symbolRaw := mload(add(add(sigData, 0x8), 28))
+            chainId := mload(add(add(sigData, 0x1), 36))
+            toAddress := mload(add(add(sigData, 0x14), 37))
+        }
+    
+        td.id = Endian.reverse64(id);
+        td.ts = Endian.reverse32(ts);
+        td.fromAddr = Endian.reverse64(fromAddr);
+        td.quantity = Endian.reverse64(quantity);
+        td.symbolRaw = Endian.reverse64(symbolRaw);
+        td.chainId = chainId;
+        td.toAddress = toAddress;
+        
+        require(thisChainId == td.chainId, "Invalid Chain ID");
+        require(block.timestamp < (td.ts + (60 * 60 * 24 * 30)), "Teleport has expired");
+        
+        require(!claimed[td.id], "Already Claimed");
+        
+        claimed[td.id] = true;
+        
+        return td;
+    }
 
-            completed[ref] = true;
+    function claim(bytes memory sigData, bytes[] calldata signatures) public returns (address toAddress) {
+        TeleportData memory td = verifySigData(sigData);
+        
+        // verify signatures
+        require(sigData.length == 69, "Signature data is the wrong size");
+        require(signatures.length <= 10, "Maximum of 10 signatures can be provided");
+        
+        bytes32 message = keccak256(sigData);
+        
+        uint8 numberSigs = 0;
+        
+        for (uint8 i = 0; i < signatures.length; i++){
+            address potential = Verify.recoverSigner(message, signatures[i]);
+            
+            // Check that they are an oracle and they haven't signed twice
+            if (oracles[potential] && !signed[td.id][potential]){
+                signed[td.id][potential] = true;
+                numberSigs++;
+                
+                if (numberSigs >= 10){
+                    break;
+                }
+            }
+        }
+        
+        require(numberSigs >= threshold, "Not enough valid signatures provided");
 
-            emit Received(to, ref, tokens);
-            emit Transfer(address(0), to, tokens);
+        balances[address(0)] = balances[address(0)].sub(td.quantity);
+        balances[td.toAddress] = balances[td.toAddress].add(td.quantity);
+        
+        emit Claimed(td.id, td.toAddress, td.quantity);
+        
+        return td.toAddress;
+    }
+
+    function updateThreshold(uint8 newThreshold) public onlyOwner returns (bool success) {
+        if (newThreshold > 0){
+            require(newThreshold <= 10, "Threshold has maximum of 10");
+            
+            threshold = newThreshold;
+
+            return true;
         }
 
-        return true;
+        return false;
     }
 
-    function updateThreshold(uint newThreshold) public onlyOwner returns (bool success) {
-        if (newThreshold > 0){
-            threshold = newThreshold;
+    function updateChainId(uint8 newChainId) public onlyOwner returns (bool success) {
+        if (newChainId > 0){
+            require(newChainId <= 100, "ChainID is too big");
+            thisChainId = newChainId;
 
             return true;
         }

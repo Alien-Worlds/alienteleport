@@ -2,10 +2,10 @@ pragma solidity ^0.6.12;
 /*
  * SPDX-License-Identifier: MIT
  */
-pragma experimental "ABIEncoderV2";
+pragma experimental ABIEncoderV2;
 
 
-library Verify {
+contract Verify {
 
   function recoverSigner(bytes32 message, bytes memory sig)
        public
@@ -195,7 +195,7 @@ contract Oracled is Owned {
 // ERC20 Token, with the addition of symbol, name and decimals and an
 // initial fixed supply, added teleport method
 // ----------------------------------------------------------------------------
-contract TeleportToken is ERC20Interface, Owned, Oracled {
+contract TeleportToken is ERC20Interface, Owned, Oracled, Verify {
     using SafeMath for uint;
 
     string public symbol;

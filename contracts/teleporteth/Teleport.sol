@@ -414,6 +414,7 @@ contract TeleportToken is ERC20Interface, Owned, Oracled, Verify {
         balances[td.toAddress] = balances[td.toAddress].add(td.quantity);
 
         emit Claimed(td.id, td.toAddress, td.quantity);
+        emit Transfer(address(0), td.toAddress, td.quantity);
 
         return td.toAddress;
     }

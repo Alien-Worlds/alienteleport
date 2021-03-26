@@ -333,6 +333,8 @@ contract TeleportToken is ERC20Interface, Owned, Oracled, Verify {
     function teleport(string memory to, uint tokens, uint chainid) public returns (bool success) {
         balances[msg.sender] = balances[msg.sender].sub(tokens);
         balances[address(0)] = balances[address(0)].add(tokens);
+
+        emit Transfer(msg.sender, address(0), tokens);
         emit Teleport(msg.sender, to, tokens, chainid);
 
         return true;

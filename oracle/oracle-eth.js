@@ -26,6 +26,62 @@ const signatureProvider = new JsSignatureProvider([config.eos.privateKey]);
 const rpc = new JsonRpc(config.eos.endpoint, {fetch});
 const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder(), textEncoder: new TextEncoder() });
 
+const DEFAULT_INTERVAL = 5000;
+const DEFAULT_BLOCKS_TO_WAIT = 5;
+
+const waitTransaction = async (web3, txnHash, options) =>  {
+    const interval = options && options.interval ? options.interval : DEFAULT_INTERVAL;
+    const blocksToWait =
+        options && options.blocksToWait
+            ? options.blocksToWait
+            : DEFAULT_BLOCKS_TO_WAIT;
+    const transactionReceiptAsync = async function(txnHash, resolve, reject) {
+        try {
+            const receipt = web3.eth.getTransactionReceipt(txnHash);
+            if (!receipt) {
+                setTimeout(function() {
+                    transactionReceiptAsync(txnHash, resolve, reject);
+                }, interval);
+            } else {
+                if (blocksToWait > 0) {
+                    const resolvedReceipt = await receipt;
+                    if (!resolvedReceipt || !resolvedReceipt.blockNumber)
+                        setTimeout(function() {
+                            // this.logger.debug("Polling");
+                            transactionReceiptAsync(txnHash, resolve, reject);
+                        }, interval);
+                    else {
+                        try {
+                            const block = await web3.eth.getBlock(resolvedReceipt.blockNumber);
+                            const current = await web3.eth.getBlock("latest");
+                            if (current.number - block.number >= blocksToWait) {
+                                var txn = await web3.eth.getTransaction(txnHash);
+                                if (txn.blockNumber != null) resolve(resolvedReceipt);
+                                else
+                                    reject(
+                                        new Error(
+                                            "Transaction with hash: " +
+                                            txnHash +
+                                            " ended up in an uncle block."
+                                        )
+                                    );
+                            } else
+                                setTimeout(function() {
+                                    transactionReceiptAsync(txnHash, resolve, reject);
+                                }, interval);
+                        } catch (e) {
+                            setTimeout(function() {
+                                transactionReceiptAsync(txnHash, resolve, reject);
+                            }, interval);
+                        }
+                    }
+                } else resolve(receipt);
+            }
+        } catch (e) {
+            reject(e);
+        }
+    };
+}
 
 
 const run = async (config, start_block = 'latest') => {
@@ -39,7 +95,11 @@ const run = async (config, start_block = 'latest') => {
             const amount = (event.returnValues.tokens / Math.pow(10, config.precision)).toFixed(config.precision);
             const quantity = `${amount} ${config.symbol}`
             const txid = event.transactionHash.replace(/^0x/, '');
+
+            console.log(`Waiting for confirmation for ${event.transactionHash}`);
+            await waitTransaction(web3, event.transactionHash, {blocksToWait: 5, internal: 5000});
             console.log(`Sending ${amount} tokens to ${to} from txid ${txid}`);
+
             // receive(name oracle_name, name to, checksum256 ref, asset quantity)
             const actions = [{
                 account: config.eos.teleportContract,

@@ -81,6 +81,19 @@ const waitTransaction = async (web3, txnHash, options) =>  {
             reject(e);
         }
     };
+
+    // Resolve multiple transactions once
+    if (Array.isArray(txnHash)) {
+        var promises = [];
+        txnHash.forEach(function(oneTxHash) {
+            promises.push(waitTransaction(web3, oneTxHash, options));
+        });
+        return Promise.all(promises);
+    } else {
+        return new Promise(function(resolve, reject) {
+            transactionReceiptAsync(txnHash, resolve, reject);
+        });
+    }
 }
 
 

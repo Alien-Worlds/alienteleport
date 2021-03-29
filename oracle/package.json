@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@eosdacio/eosio-statereceiver": "^1.0.2",
+    "abi-decoder": "^2.4.0",
     "eosjs": "^21.0.3",
     "ethereumjs-util": "^7.0.4",
     "node-fetch": "^2.6.0",

@@ -12,6 +12,7 @@ const {Api, JsonRpc} = require('eosjs');
 const {TextDecoder, TextEncoder} = require('text-encoding');
 const Web3 = require('web3');
 const ethUtil = require('ethereumjs-util');
+const abiDecoder = require('abi-decoder');
 
 const {JsSignatureProvider} = require('eosjs/dist/eosjs-jssig');
 const fetch = require('node-fetch');
@@ -19,6 +20,7 @@ const fetch = require('node-fetch');
 const config = require(process.env['CONFIG'] || './config');
 
 const ethAbi = require(`./eth_abi`);
+abiDecoder.addABI(ethAbi);
 
 const web3 = new Web3(new Web3.providers.WebsocketProvider(config.eth.wsEndpoint));
 const contract = new web3.eth.Contract(ethAbi, config.eth.teleportContract);
@@ -96,51 +98,139 @@ const waitTransaction = async (web3, txnHash, options) =>  {
     }
 }
 
+const eventValue = (eventData, name) => {
+    let val = null;
+    const data = eventData.find(e => e.name === name);
+    if (data){
+        val = data.value;
+    }
+    return val;
+}
 
-const run = async (config, start_block = 'latest') => {
-    console.log(`Starting ETH watcher for EOS oracle ${config.eos.oracleAccount}`);
+const getActionFromEvent = (event, confirmed = false) => {
+    // console.log(event)
+    const to = eventValue(event.data, 'to');
+    const chain_id = eventValue(event.data, 'chainId');
+    const amount = (eventValue(event.data, 'tokens') / Math.pow(10, config.precision)).toFixed(config.precision);
+    const quantity = `${amount} ${config.symbol}`
+    const txid = event.transactionHash.replace(/^0x/, '');
 
-    contract.events.Teleport({
-        fromBlock: start_block
-    })
-        .on('data', async function(event){
-            const to = event.returnValues.to
-            const amount = (event.returnValues.tokens / Math.pow(10, config.precision)).toFixed(config.precision);
-            const quantity = `${amount} ${config.symbol}`
-            const txid = event.transactionHash.replace(/^0x/, '');
+    return {
+        account: config.eos.teleportContract,
+        name: 'received',
+        authorization: [{
+            actor: config.eos.oracleAccount,
+            permission: 'active'
+        }],
+        data: {
+            oracle_name: config.eos.oracleAccount,
+            to,
+            ref: txid,
+            quantity,
+            chain_id,
+            confirmed
+        }
+    }
+}
 
-            console.log(`Waiting for confirmation for ${event.transactionHash}`);
-            await waitTransaction(web3, event.transactionHash, {blocksToWait: 5, internal: 5000});
-            console.log(`Sending ${amount} tokens to ${to} from txid ${txid}`);
 
-            // receive(name oracle_name, name to, checksum256 ref, asset quantity)
-            const actions = [{
-                account: config.eos.teleportContract,
-                name: 'received',
-                authorization: [{
-                    actor: config.eos.oracleAccount,
-                    permission: 'active'
-                }],
-                data: {
-                    oracle_name: config.eos.oracleAccount,
-                    to,
-                    ref: txid,
-                    quantity
-                }
-            }];
+const sendConfirmation = async (event) => {
+    console.log(`Waiting for confirmed tx ${event.transactionHash}`);
+    await waitTransaction(web3, event.transactionHash, {blocksToWait: 5, internal: 5000});
+    console.log(`Tx ${event.transactionHash} confirmed`);
+    const action = getActionFromEvent(event, true);
+    const actions = [action];
+    // console.log(action.data)
+
+    try {
+        const res = await eos_api.transact({actions}, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        console.log(`Sent confirmation with txid ${res.transaction_id}`);
+    }
+    catch (e){
+        console.error(`Error pushing confirmation ${e.message}`);
+    }
+}
+
+
+const handleLog = async (log) => {
+    const eventData = abiDecoder.decodeLogs([log])[0];
+    log.data = eventData.events;
+    const actions = [];
+
+    switch (eventData.name){
+        case 'Teleport':
+            const action = getActionFromEvent(log);
+            actions.push(action);
 
             try {
                 const res = await eos_api.transact({actions}, {
                     blocksBehind: 3,
                     expireSeconds: 30,
                 });
-                console.log(`Sent confirmation with txid ${res.transaction_id}`);
+                console.log(`Sent notification of teleport with txid ${res.transaction_id}`);
             }
             catch (e){
-                console.error(`Error pushing confirmation ${e.message}`);
+                console.error(`Error pushing notification ${e.message}`);
             }
-        })
-        .on('error', console.error);
+
+            console.log(`Starting process to wait for confirmation for ${log.transactionHash}`);
+            sendConfirmation(log);
+
+            break;
+        case 'Claimed':
+            const id = eventValue(eventData.events, 'id');
+            const to_eth = eventValue(eventData.events, 'to').replace('0x', '') + '000000000000000000000000'
+            const quantity = (eventValue(eventData.events, 'tokens') / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol;
+
+            actions.push({
+                account: config.eos.teleportContract,
+                name: 'claimed',
+                authorization: [{
+                    actor: config.eos.oracleAccount,
+                    permission: 'active'
+                }],
+                data: {
+                    oracle_name: config.eos.oracleAccount,
+                    id,
+                    to_eth,
+                    quantity
+                }
+            });
+
+            try {
+                const res = await eos_api.transact({actions}, {
+                    blocksBehind: 3,
+                    expireSeconds: 30,
+                });
+                console.log(`Sent notification of claim with txid ${res.transaction_id}`);
+            }
+            catch (e){
+                console.error(`Error pushing claim confirmation ${e.message}`);
+            }
+            break;
+    }
+}
+
+const run = async (config, start_block = 'latest') => {
+    console.log(`Starting ETH watcher for EOS oracle ${config.eos.oracleAccount}`);
+
+    const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
+    const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
+
+    web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [claimed_topic]}, function(err, res){
+        if (err){
+            console.error(`Error subscribing to claim logs ${err.message}`);
+        }
+    }).on("data", handleLog);
+
+    web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [teleport_topic]}, function(err, res){
+        if (err){
+            console.error(`Error subscribing to teleport logs ${err.message}`);
+        }
+    }).on("data", handleLog);
 };
 
 let start_block = 'latest';

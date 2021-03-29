@@ -53,34 +53,28 @@ namespace alienworlds {
 
         /* Oracles authorised to send receipts */
         struct [[eosio::table("receipts")]] receipt_item {
-          uint64_t     id;
-          checksum256  ref;
-          name         to;
-          uint8_t      confirmations;
-          asset        quantity;
-          vector<name> approvers;
+          uint64_t       id;
+          time_point_sec date;
+          checksum256    ref;
+          name           to;
+          uint8_t        chain_id;
+          uint8_t        confirmations;
+          asset          quantity;
+          vector<name>   approvers;
+          bool           completed;
 
           uint64_t    primary_key() const { return id; }
+          uint64_t    by_to() const { return to.value; }
           checksum256 by_ref() const { return ref; }
         };
         typedef multi_index<"receipts"_n, receipt_item,
-            indexed_by<"byref"_n, const_mem_fun<receipt_item, checksum256, &receipt_item::by_ref>>> receipts_table;
-
-        /* Mark completed transactions */
-        struct [[eosio::table("completions")]] completion_item {
-          uint64_t    id;
-          checksum256 ref;
-
-          uint64_t    primary_key() const { return id; }
-          checksum256 by_ref() const { return ref; }
-        };
-        typedef multi_index<"completions"_n, completion_item,
-            indexed_by<"byref"_n, const_mem_fun<completion_item, checksum256, &completion_item::by_ref>>> completions_table;
+            indexed_by<"byref"_n, const_mem_fun<receipt_item, checksum256, &receipt_item::by_ref>>,
+            indexed_by<"byto"_n, const_mem_fun<receipt_item, uint64_t, &receipt_item::by_to>>
+        > receipts_table;
 
         deposits_table    _deposits;
         oracles_table     _oracles;
         receipts_table    _receipts;
-        completions_table _completions;
         teleports_table   _teleports;
 
         void require_oracle(name account);
@@ -97,12 +91,12 @@ namespace alienworlds {
         [[eosio::action]] void logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity, uint8_t chain_id, checksum256 eth_address);
         [[eosio::action]] void sign(name oracle_name, uint64_t id, string signature);
         [[eosio::action]] void withdraw(name from, asset quantity);
-        [[eosio::action]] void received(name oracle_name, name to, checksum256 ref, asset quantity);
+        [[eosio::action]] void received(name oracle_name, name to, checksum256 ref, asset quantity, uint8_t chain_id, bool confirmed);
+        [[eosio::action]] void claimed(name oracle_name, uint64_t id, checksum256 to_eth, asset quantity);
         [[eosio::action]] void regoracle(name oracle_name);
         [[eosio::action]] void unregoracle(name oracle_name);
         [[eosio::action]] void sign(string signature);
         [[eosio::action]] void delreceipts();
-        [[eosio::action]] void delcomps();
         [[eosio::action]] void delteles();
     };
 } // namespace alienworlds

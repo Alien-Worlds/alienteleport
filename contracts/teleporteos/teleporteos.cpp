@@ -6,7 +6,6 @@ teleporteos::teleporteos(name s, name code, datastream<const char *> ds) : contr
                                                                            _deposits(get_self(), get_self().value),
                                                                            _oracles(get_self(), get_self().value),
                                                                            _receipts(get_self(), get_self().value),
-                                                                           _completions(get_self(), get_self().value),
                                                                            _teleports(get_self(), get_self().value) {}
 
 /* Notifications for tlm transfer */
@@ -116,13 +115,8 @@ void teleporteos::sign(name oracle_name, uint64_t id, string signature) {
     });
 }
 
-void teleporteos::received(name oracle_name, name to, checksum256 ref, asset quantity) {
+void teleporteos::received(name oracle_name, name to, checksum256 ref, asset quantity, uint8_t chain_id, bool confirmed) {
     require_oracle(oracle_name);
-
-    // check it has not already been completed
-    auto comp_ind = _completions.get_index<"byref"_n>();
-    auto completion = comp_ind.find(ref);
-    check(completion == comp_ind.end(), "This reference has already completed");
 
     auto ref_ind = _receipts.get_index<"byref"_n>();
     auto receipt = ref_ind.find(ref);
@@ -133,41 +127,70 @@ void teleporteos::received(name oracle_name, name to, checksum256 ref, asset qua
     if (receipt == ref_ind.end()) {
         _receipts.emplace(get_self(), [&](auto &r){
             r.id = _receipts.available_primary_key();
+            r.date = current_time_point();
             r.ref = ref;
+            r.chain_id = chain_id;
             r.to = to;
-            r.confirmations = 1;
             r.quantity = quantity;
+
             vector<name> approvers;
-            approvers.push_back(oracle_name);
+            if (confirmed){
+                r.confirmations = 1;
+                approvers.push_back(oracle_name);
+            }
             r.approvers = approvers;
+
         });
     }
     else {
-        check(receipt->quantity == quantity, "Quantity mismatch");
-        check(receipt->to == to, "Account mismatch");
-        auto existing = find (receipt->approvers.begin(), receipt->approvers.end(), oracle_name);
-        check (existing == receipt->approvers.end(), "Oracle has already approved");
+        if (confirmed){
+            check(!receipt->completed, "This teleport has already completed");
 
-        if (receipt->confirmations >= ORACLE_CONFIRMATIONS - 1) { // check for one less because of this confirmation
-            // fully confirmed, send tokens and mark as completed
-            _completions.emplace(get_self(), [&](auto &c){
-                c.id = _receipts.available_primary_key();
-                c.ref = ref;
+            check(receipt->quantity == quantity, "Quantity mismatch");
+            check(receipt->to == to, "Account mismatch");
+            auto existing = find (receipt->approvers.begin(), receipt->approvers.end(), oracle_name);
+            check (existing == receipt->approvers.end(), "Oracle has already approved");
+            bool completed = false;
+
+            if (receipt->confirmations >= ORACLE_CONFIRMATIONS - 1) { // check for one less because of this confirmation
+                string memo = "Teleport";
+                action(
+                    permission_level{get_self(), "active"_n},
+                    TOKEN_CONTRACT, "transfer"_n,
+                    make_tuple(get_self(), to, quantity, memo)
+                ).send();
+
+                completed = true;
+            }
+
+            _receipts.modify(*receipt, get_self(), [&](auto &r){
+                r.confirmations = receipt->confirmations + 1;
+                r.approvers.push_back(oracle_name);
+                r.completed = completed;
             });
-
-            string memo = "Teleport from Ethereum";
-            action(
-               permission_level{get_self(), "active"_n},
-               TOKEN_CONTRACT, "transfer"_n,
-               make_tuple(get_self(), to, quantity, memo)
-            ).send();
         }
-
-        _receipts.modify(*receipt, get_self(), [&](auto &r){
-            r.confirmations = receipt->confirmations + 1;
-            r.approvers.push_back(oracle_name);
-        });
+        else {
+            check(false, "Another oracle has already registered teleport");
+        }
     }
+}
+
+/*
+ * Marks a teleport as claimed
+ */
+void teleporteos::claimed(name oracle_name, uint64_t id, checksum256 to_eth, asset quantity) {
+    require_oracle(oracle_name);
+
+    auto teleport = _teleports.find(id);
+    check(teleport != _teleports.end(), "Teleport not found");
+
+    check(teleport->quantity == quantity, "Quantity mismatch");
+    check(teleport->eth_address == to_eth, "Account mismatch");
+    check(!teleport->claimed, "Already marked as claimed");
+
+    _teleports.modify(*teleport, same_payer, [&](auto &t){
+        t.claimed = true;
+    });
 }
 
 void teleporteos::regoracle(name oracle_name) {
@@ -176,7 +199,7 @@ void teleporteos::regoracle(name oracle_name) {
     check(is_account(oracle_name), "Oracle account does not exist");
 
     _oracles.emplace(get_self(), [&](auto &o){
-      o.account = oracle_name;
+        o.account = oracle_name;
     });
 }
 
@@ -196,15 +219,6 @@ void teleporteos::delreceipts() {
     auto receipt = _receipts.begin();
     while (receipt != _receipts.end()) {
        receipt = _receipts.erase(receipt);
-    }
-}
-
-void teleporteos::delcomps() {
-    require_auth(get_self());
-
-    auto comp = _completions.begin();
-    while (comp != _completions.end()) {
-        comp = _completions.erase(comp);
     }
 }
 

@@ -4,23 +4,26 @@
     "types": [],
     "structs": [
         {
-            "name": "completion_item",
+            "name": "claimed",
             "base": "",
             "fields": [
+                {
+                    "name": "oracle_name",
+                    "type": "name"
+                },
                 {
                     "name": "id",
                     "type": "uint64"
                 },
                 {
-                    "name": "ref",
+                    "name": "to_eth",
                     "type": "checksum256"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
                 }
             ]
-        },
-        {
-            "name": "delcomps",
-            "base": "",
-            "fields": []
         },
         {
             "name": "delreceipts",
@@ -95,12 +98,20 @@
                     "type": "uint64"
                 },
                 {
+                    "name": "date",
+                    "type": "time_point_sec"
+                },
+                {
                     "name": "ref",
                     "type": "checksum256"
                 },
                 {
                     "name": "to",
                     "type": "name"
+                },
+                {
+                    "name": "chain_id",
+                    "type": "uint8"
                 },
                 {
                     "name": "confirmations",
@@ -113,6 +124,10 @@
                 {
                     "name": "approvers",
                     "type": "name[]"
+                },
+                {
+                    "name": "completed",
+                    "type": "bool"
                 }
             ]
         },
@@ -135,6 +150,14 @@
                 {
                     "name": "quantity",
                     "type": "asset"
+                },
+                {
+                    "name": "chain_id",
+                    "type": "uint8"
+                },
+                {
+                    "name": "confirmed",
+                    "type": "bool"
                 }
             ]
         },
@@ -257,8 +280,8 @@
     ],
     "actions": [
         {
-            "name": "delcomps",
-            "type": "delcomps",
+            "name": "claimed",
+            "type": "claimed",
             "ricardian_contract": ""
         },
         {
@@ -308,13 +331,6 @@
         }
     ],
     "tables": [
-        {
-            "name": "completions",
-            "type": "completion_item",
-            "index_type": "i64",
-            "key_names": [],
-            "key_types": []
-        },
         {
             "name": "deposits",
             "type": "deposit_item",

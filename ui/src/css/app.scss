@@ -1210,7 +1210,7 @@ form.amount.error {
   }
 }
 
-p.notice {
+p.notice, p.error {
   font-size: 14px;
   font-weight: 700;
 }
@@ -1219,7 +1219,7 @@ p.notice {
   text-decoration: underline;
 }
 
-.notlogged p.notice {
+.notlogged p.notice, p.error {
   color: #e7384d;
 }
 

@@ -91,7 +91,7 @@
                                 <div class="accessed active" v-if="getAccountName.wax">
                                     <p>{{$t('home.liquid_balance')}}</p>
                                     <div class="balance">{{waxTlmBalance}} TLM</div>
-                                    <div v-bind:class="['transfer', {active: getAccountName.ethereum && getAccountName.wax}]" v-if="waxTlmBalance != 0">
+                                    <div v-bind:class="['transfer', {active: getAccountName.ethereum && getAccountName.wax && !unsupportedChain}]" v-if="waxTlmBalance != 0">
                                         <a class="button" @click="startTransfer('WAX', networkName)">{{$t('home.transfer')}}</a>
                                         <p class="notice" v-if="getAccountName.ethereum" v-html="$t('home.from_wax_to', {networkName})"></p>
                                     </div>
@@ -101,7 +101,8 @@
                                 <div class="tfs two"></div>
                             </div>
                             <div class="loginwrap eth-bsc">
-                                <div class="logowrap">
+                                <p v-if="unsupportedChain" class="error">This chain is not supported, please select Ethereum Mainnet or Binance Smart Chain in Metamask</p>
+                                <div class="logowrap" v-if="!unsupportedChain">
                                     <div class="logo ethereum" v-if="getChainId.ethereum == 1 || !getAccountName.ethereum"></div>
                                     <div class="logo binance" v-if="getChainId.ethereum != 1 || !getAccountName.ethereum"></div>
                                 </div>
@@ -109,10 +110,10 @@
                                     <a class="button" @click="login('ethereum')">{{$t('home.log_in')}}</a>
                                     <p class="notice" v-html="$t('home.eth_binance_login')"></p>
                                 </div>
-                                <div class="accessed active" v-if="getAccountName.ethereum">
+                                <div class="accessed active" v-if="getAccountName.ethereum && !unsupportedChain">
                                     <p>{{$t('home.liquid_balance')}}</p>
                                     <div class="balance">{{ethTlmBalance}} TLM</div>
-                                    <div v-bind:class="['transfer', {active: getAccountName.ethereum && getAccountName.wax}]" v-if="ethTlmBalance != 0">
+                                    <div v-bind:class="['transfer', {active: getAccountName.ethereum && getAccountName.wax && !unsupportedChain}]" v-if="ethTlmBalance != 0">
                                         <a class="button" @click="startTransfer(networkName, 'WAX')">{{$t('home.transfer')}}</a>
                                         <p class="notice" v-html="$t('home.from_to_wax', {networkName})"></p>
                                     </div>

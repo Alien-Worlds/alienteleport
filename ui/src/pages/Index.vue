@@ -360,7 +360,7 @@
                     // console.log(actions)
                     const res = await this.$store.dispatch('ual/transact', {actions, network: 'wax'})
                     // alert('Success!')
-                    await this.$store.commit('global/setInfo', $t('dialog.first_stage_wax'))
+                    await this.$store.commit('global/setInfo', this.$t('dialog.first_stage_wax'))
                     this.showOverlay = true
                 }
                 catch (e){
@@ -378,7 +378,7 @@
                     try {
                         const resp = await tlmInstance.methods.teleport(this.getAccountName.wax, quantity * 10000, 0).send({from: this.getAccountName.ethereum})
                         console.log(resp)
-                        await this.$store.commit('global/setInfo', $t('dialog.first_stage_eth'))
+                        await this.$store.commit('global/setInfo', this.$t('dialog.first_stage_eth'))
                         this.showOverlay = true
                     }
                     catch (e) {
@@ -398,7 +398,7 @@
                 });
 
                 if (!res.rows.length){
-                    throw new Error($t('dialog.could_not_find_teleport', {teleportId}));
+                    throw new Error(this.$t('dialog.could_not_find_teleport', {teleportId}));
                 }
 
                 const teleportData = res.rows[0];

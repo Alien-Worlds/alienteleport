@@ -4,5 +4,9 @@ export async function showError ({ commit }, errorMsg) {
 }
 
 export async function showInfo ({ commit }, infoMsg) {
-  await commit('setInfo', infoMsg)
+    await commit('setInfo', infoMsg)
+}
+
+export async function showProcessing ({ commit }, processingMsg) {
+    await commit('setProcessing', processingMsg)
 }

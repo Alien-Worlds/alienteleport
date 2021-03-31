@@ -8,12 +8,14 @@ module.exports = {
         '1': {
             name: 'Ethereum',
             tlmContract: '0x888888848b652b3e3a0f34c96e00eec0f3a23f72',
-            destinationChainId: 1
+            destinationChainId: 1,
+            className: 'ethereum'
         },
         '56': {
             name: 'BSC',
             tlmContract: '0x2222227E22102Fe3322098e4CBfE18cFebD57c95',
-            destinationChainId: 2
+            destinationChainId: 2,
+            className: 'binance'
         }
     }
 }

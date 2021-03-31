@@ -33,15 +33,15 @@
                     </div>
                     <div v-bind:class="['type', 'success', {active: alertInfo}]">
                         <div class="icon"></div>
-                        <h3 class="title">{{$t('dialog.error')}}</h3>
+                        <h3 class="title">{{$t('dialog.success')}}</h3>
                         <p>{{alertInfo}}</p>
                         <a class="button invert close" @click="closeOverlay">{{$t('dialog.ok')}}</a>
                     </div>
-                    <div class="type processing">
+                    <div v-bind:class="['type', 'processing', {active: alertProcessing.message}]">
                         <div class="logincontainer">
                             <div class="loginwrap from">
                                 <div class="logowrap">
-                                    <div class="logo"></div>
+                                    <div v-bind:class="['logo', alertProcessing.from]"></div>
                                 </div>
                             </div>
                             <div class="loginwrap icon">
@@ -49,14 +49,14 @@
                             </div>
                             <div class="loginwrap to">
                                 <div class="logowrap">
-                                    <div class="logo"></div>
+                                    <div v-bind:class="['logo', alertProcessing.to]"></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="status">processing...</div>
-                        <div class="amount">00000000</div>
-                        <div class="notice">this transaction will take a few minutes...</div>
-                        <a class="button invert close dashload">Go to Dashboard</a>
+                        <div class="status">{{$t('dialog.processing')}}...</div>
+                        <div class="amount">{{alertProcessing.amount}}</div>
+                        <div class="notice">{{alertProcessing.message}}</div>
+                        <a class="button invert close dashload" @click="closeOverlay">Go to Dashboard</a>
                     </div>
 
                     <div class="overlayhitbox" @click="closeOverlay"></div>
@@ -125,8 +125,7 @@
 
                     </div>
 
-                    <!-- ------------------- DASHBOARD -------------------
-              ------------------------------------------------------ -->
+                    <!-- ------------------- DASHBOARD ------------------- -->
                     <div id="dashboard" v-bind:class="['contents', {active: showDashboardPanel}]">
                         <div class="opener">
                             <div class="tfs two"></div>
@@ -214,7 +213,8 @@
                 getAccountName: 'ual/getAccountName',
                 getChainId: 'ual/getChainId',
                 alertError: 'global/getError',
-                alertInfo: 'global/getInfo'
+                alertInfo: 'global/getInfo',
+                alertProcessing: 'global/getProcessing'
             })
         },
         data() {
@@ -317,10 +317,25 @@
                 this.showTransfer = false
 
                 if (fromNetwork === 'WAX'){
-                    await this.teleportWaxEth(qty, process.env.networks[this.getChainId.ethereum].destinationChainId, this.getAccountName.ethereum)
+                    const destinationChainId = process.env.networks[this.getChainId.ethereum].destinationChainId
+                    const toClass = process.env.networks[this.getChainId.ethereum].className
+                    await this.$store.commit('global/setProcessing', {from: 'wax', to: toClass, amount: qty, message: this.$t('transfer.waiting_approval_transfer')})
+                    this.showOverlay = true
+
+                    await this.teleportWaxEth(qty, destinationChainId, this.getAccountName.ethereum)
+
+                    this.updateBalances()
+                    this.loadTeleports()
                 }
                 else {
+                    const fromClass = process.env.networks[this.getChainId.ethereum].className
+                    await this.$store.commit('global/setProcessing', {from: fromClass, to: 'wax', amount: qty, message: this.$t('transfer.waiting_approval_transfer')})
+                    this.showOverlay = true
+
                     await this.teleportEthWax(qty, 0, this.getAccountName.wax)
+
+                    this.updateBalances()
+                    this.loadTeleports()
                 }
 
                 if (!txListInterval){
@@ -361,10 +376,12 @@
                     const res = await this.$store.dispatch('ual/transact', {actions, network: 'wax'})
                     // alert('Success!')
                     await this.$store.commit('global/setInfo', this.$t('dialog.first_stage_wax'))
+                    await this.$store.commit('global/clearProcessing', null)
                     this.showOverlay = true
                 }
                 catch (e){
                     await this.$store.commit('global/setError', e.message)
+                    await this.$store.commit('global/clearProcessing', null)
                     this.showOverlay = true
                     // alert(e.message)
                 }
@@ -379,10 +396,12 @@
                         const resp = await tlmInstance.methods.teleport(this.getAccountName.wax, quantity * 10000, 0).send({from: this.getAccountName.ethereum})
                         console.log(resp)
                         await this.$store.commit('global/setInfo', this.$t('dialog.first_stage_eth'))
+                        await this.$store.commit('global/clearProcessing', null)
                         this.showOverlay = true
                     }
                     catch (e) {
                         await this.$store.commit('global/setError', e.message)
+                        await this.$store.commit('global/clearProcessing', null)
                         this.showOverlay = true
                     }
                 }
@@ -440,7 +459,7 @@
                 }
             },
             async loadTeleports() {
-                const teleports = []
+                let teleports = []
 
                 if (this.getAccountName.wax){
                     const res = await this.$wax.rpc.get_table_rows({
@@ -490,6 +509,14 @@
                     })
                 }
 
+                teleports = teleports.map(t => {
+                    if (t.date){
+                        t.time = this.parseDate(t.date) / 1000
+                    }
+                    return t
+                }).sort((a, b) => (a.time < b.time)?1:-1)
+
+                console.log(`teleports`, teleports)
                 this.teleports = teleports
             },
             closeOverlay() {
@@ -498,6 +525,23 @@
                 this.$refs.teleport_amount.value = ''
                 this.$store.commit('global/setInfo', '')
                 this.$store.commit('global/setError', '')
+                this.$store.commit('global/clearProcessing', null)
+            },
+            parseDate (fullStr) {
+                const [fullDate] = fullStr.split('.')
+                const [dateStr, timeStr] = fullDate.split('T')
+                const [year, month, day] = dateStr.split('-')
+                const [hourStr, minuteStr, secondStr] = timeStr.split(':')
+
+                const dt = new Date()
+                dt.setUTCFullYear(year)
+                dt.setUTCMonth(month - 1)
+                dt.setUTCDate(day)
+                dt.setUTCHours(hourStr)
+                dt.setUTCMinutes(minuteStr)
+                dt.setUTCSeconds(secondStr)
+
+                return dt.getTime()
             }
         },
         watch: {

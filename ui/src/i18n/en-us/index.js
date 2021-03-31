@@ -9,6 +9,7 @@ export default {
         input_amount: 'input amount',
         cancel: 'Cancel',
         approve: 'Approve',
+        waiting_approval_transfer: 'Waiting for approval of transfer'
     },
     dialog: {
         error: 'Error',
@@ -17,7 +18,8 @@ export default {
         first_stage_wax: 'First stage complete, please wait for the transfer to be approved before claiming',
         first_stage_eth: 'First stage complete, please wait for the tokens to be sent to your WAX account',
         could_not_find_teleport: 'Could not find teleport with ID {teleportId}',
-        tlm_claimed: 'Your Trilium has been claimed and will show on the network after being confirmed in a block'
+        tlm_claimed: 'Your Trilium has been claimed and will show on the network after being confirmed in a block',
+        processing: 'processing'
     },
     home: {
         teleport: 'Teleport',

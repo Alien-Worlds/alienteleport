@@ -455,7 +455,10 @@
                     await this.$store.commit('global/setInfo', $t('dialog.tlm_claimed'))
                     this.showOverlay = true
 
-                    console.log(resp)
+                    this.updateBalances()
+                    this.loadTeleports()
+
+                    // console.log(resp)
                 }
             },
             async loadTeleports() {

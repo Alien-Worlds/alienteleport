@@ -160,6 +160,8 @@ const handleLog = async (log) => {
     log.data = eventData.events;
     const actions = [];
 
+    console.log('Handle Log')
+
     switch (eventData.name){
         case 'Teleport':
             const action = getActionFromEvent(log);
@@ -215,7 +217,7 @@ const handleLog = async (log) => {
 }
 
 const run = async (config, start_block = 'latest') => {
-    console.log(`Starting ETH watcher for EOS oracle ${config.eos.oracleAccount}`);
+    console.log(`Starting ETH watcher for EOS oracle ${config.eos.oracleAccount}, starting at ${start_block}`);
 
     const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
     const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';

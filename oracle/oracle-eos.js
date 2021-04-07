@@ -72,7 +72,7 @@ class TraceHandler {
             name: 'sign',
             authorization: [{
                 actor: config.eos.oracleAccount,
-                permission: 'active'
+                permission: config.eos.oraclePermission || 'active'
             }],
             data: {
                 oracle_name: config.eos.oracleAccount,

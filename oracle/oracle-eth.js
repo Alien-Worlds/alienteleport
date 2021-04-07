@@ -120,7 +120,7 @@ const getActionFromEvent = (event, confirmed = false) => {
         name: 'received',
         authorization: [{
             actor: config.eos.oracleAccount,
-            permission: 'active'
+            permission: config.eos.oraclePermission || 'active'
         }],
         data: {
             oracle_name: config.eos.oracleAccount,
@@ -192,7 +192,7 @@ const handleLog = async (log) => {
                 name: 'claimed',
                 authorization: [{
                     actor: config.eos.oracleAccount,
-                    permission: 'active'
+                    permission: config.eos.oraclePermission || 'active'
                 }],
                 data: {
                     oracle_name: config.eos.oracleAccount,

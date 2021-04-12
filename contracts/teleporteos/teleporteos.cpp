@@ -11,7 +11,7 @@ teleporteos::teleporteos(name s, name code, datastream<const char *> ds) : contr
 /* Notifications for tlm transfer */
 void teleporteos::transfer(name from, name to, asset quantity, string memo) {
     if (to == get_self()) {
-        check(quantity.amount >= 100'0000, "Transfer is below minimum");
+        check(quantity.amount >= 100'0000, "Transfer is below minimum of 100 TLM");
 
         auto deposit = _deposits.find(from.value);
         if (deposit == _deposits.end()){
@@ -58,7 +58,7 @@ void teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checksum
     check(quantity.is_valid(), "Amount is not valid");
     check(quantity.amount > 0, "Amount cannot be negative");
     check(quantity.symbol.is_valid(), "Invalid symbol name");
-    check(quantity.amount >= 100'0000, "Transfer is below minimum");
+    check(quantity.amount >= 100'0000, "Transfer is below minimum of 100 TLM");
 
     auto deposit = _deposits.find(from.value);
     check(deposit != _deposits.end(), "Deposit not found, please transfer the tokens first");

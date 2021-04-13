@@ -22,7 +22,7 @@ const config = require(process.env['CONFIG'] || './config');
 const ethAbi = require(`./eth_abi`);
 abiDecoder.addABI(ethAbi);
 
-const web3 = new Web3(new Web3.providers.WebsocketProvider(config.eth.wsEndpoint));
+const web3 = new Web3(new Web3.providers.WebsocketProvider(config.eth.wsEndpoint, {clientConfig:{maxReceivedFrameSize: 10000000000,maxReceivedMessageSize: 10000000000}}));
 const contract = new web3.eth.Contract(ethAbi, config.eth.teleportContract);
 const signatureProvider = new JsSignatureProvider([config.eos.privateKey]);
 const rpc = new JsonRpc(config.eos.endpoint, {fetch});

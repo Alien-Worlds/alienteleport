@@ -473,7 +473,8 @@
                         key_type: 'i64',
                         lower_bound: this.getAccountName.wax,
                         upper_bound: this.getAccountName.wax,
-                        reverse: true
+                        reverse: true,
+                        limit: 50
                     })
                     console.log('Res', res)
                     res.rows.forEach(r => {

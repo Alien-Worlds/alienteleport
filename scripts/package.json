@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@types/node": "^14.14.37",
+    "eosjs": "^21.0.3",
+    "node-fetch": "^2.6.1"
+  }
+}

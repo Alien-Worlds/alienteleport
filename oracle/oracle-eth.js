@@ -151,19 +151,29 @@ const sendConfirmation = async (event) => {
     }
     catch (e){
         console.error(`Error pushing confirmation ${e.message}`);
+
+        if (e.message.indexOf('already completed') === -1){
+            const rand = Math.random() * 20;
+            setTimeout(() => {
+                sendConfirmation(event);
+            }, rand * 1000);
+        }
     }
 }
 
 
+let claimed_last_block = null;
+let teleport_last_block = null;
 const handleLog = async (log) => {
     const eventData = abiDecoder.decodeLogs([log])[0];
     log.data = eventData.events;
     const actions = [];
 
-    console.log('Handle Log')
+    console.log('Handle Log', log)
 
     switch (eventData.name){
         case 'Teleport':
+            teleport_last_block = log.blockNumber;
             const action = getActionFromEvent(log);
             actions.push(action);
 
@@ -183,6 +193,7 @@ const handleLog = async (log) => {
 
             break;
         case 'Claimed':
+            claimed_last_block = log.blockNumber;
             const id = eventValue(eventData.events, 'id');
             const to_eth = eventValue(eventData.events, 'to').replace('0x', '') + '000000000000000000000000'
             const quantity = (eventValue(eventData.events, 'tokens') / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol;
@@ -216,23 +227,71 @@ const handleLog = async (log) => {
     }
 }
 
-const run = async (config, start_block = 'latest') => {
-    console.log(`Starting ETH watcher for EOS oracle ${config.eos.oracleAccount}, starting at ${start_block}`);
+let claimed_subscription = null;
+let teleport_subscription = null;
+const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
+const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
 
-    const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
-    const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
+const unsubscribe_claimed = async () => {
+    return new Promise((resolve) => {
+        if (claimed_subscription){
+            claimed_subscription.unsubscribe((err, success) => {
+                resolve()
+            });
+        }
+        else {
+            resolve()
+        }
+    });
+}
+const unsubscribe_teleport = async () => {
+    return new Promise((resolve) => {
+        if (teleport_subscription){
+            teleport_subscription.unsubscribe((err, success) => {
+                resolve()
+            });
+        }
+        else {
+            resolve()
+        }
+    });
+}
 
-    web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [claimed_topic]}, function(err, res){
+const subscribe = async (config) => {
+    console.log('subscribing to all events');
+    await unsubscribe_claimed();
+    await unsubscribe_teleport();
+
+    claimed_subscription = web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [claimed_topic]}, function(err, res){
         if (err){
             console.error(`Error subscribing to claim logs ${err.message}`);
         }
-    }).on("data", handleLog);
+    }).on("data", handleLog).on("error", async (e) => {
+        console.log('Error in claimed log listener', e);
+        await unsubscribe_claimed();
+        await unsubscribe_teleport();
+        subscribe(config);
+    });
 
-    web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [teleport_topic]}, function(err, res){
+    teleport_subscription = web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [teleport_topic]}, function(err, res){
         if (err){
             console.error(`Error subscribing to teleport logs ${err.message}`);
         }
-    }).on("data", handleLog);
+    }).on("data", handleLog).on("error", async (e) => {
+        console.log('Error in teleport log listener', e);
+        await unsubscribe_claimed();
+        await unsubscribe_teleport();
+        subscribe(config);
+    });
+}
+
+const run = async (config, start_block = 'latest') => {
+    console.log(`Starting ETH watcher for EOS oracle ${config.eos.oracleAccount}, starting at ${start_block}`);
+
+    claimed_last_block = start_block;
+    teleport_last_block = start_block;
+
+    subscribe(config);
 };
 
 let start_block = 'latest';

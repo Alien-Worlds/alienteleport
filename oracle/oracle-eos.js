@@ -35,53 +35,53 @@ class TraceHandler {
 
     async sendSignature(data, data_serialized, retries=0) {
         console.log(data, data_serialized, Buffer.from(data_serialized).toString('hex'));
-        if (retries > 5){
+        if (retries > 10){
             console.error(`Exceeded retries`);
             return;
         }
 
-        const teleport_res = await rpc.get_table_rows({
-            code: this.config.eos.teleportContract,
-            scope: this.config.eos.teleportContract,
-            table: 'teleports',
-            lower_bound: data.id,
-            upper_bound: data.id,
-            limit: 1
-        });
-        console.log(teleport_res);
-        if (!teleport_res.rows.length){
-            throw new Error(`Could not find teleport with id ${data.id}`);
-        }
-        const chain_data = teleport_res.rows[0];
-
-
-        // sign the transaction and send to the eos chain
-        const data_buf = Buffer.from(data_serialized);
-        const msg_hash = ethUtil.keccak(data_buf);
-        console.log(msg_hash.toString('hex'));
-        // console.log(this.config.eth.privateKey);
-        const pk = Buffer.from(this.config.eth.privateKey, "hex");
-        const sig = ethUtil.ecsign(msg_hash, pk);
-        // console.log(pk, sig);
-
-        const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
-        console.log(signature);
-
-        const actions = [{
-            account: config.eos.teleportContract,
-            name: 'sign',
-            authorization: [{
-                actor: config.eos.oracleAccount,
-                permission: config.eos.oraclePermission || 'active'
-            }],
-            data: {
-                oracle_name: config.eos.oracleAccount,
-                id: data.id,
-                signature
-            }
-        }];
-
         try {
+            const teleport_res = await rpc.get_table_rows({
+                code: this.config.eos.teleportContract,
+                scope: this.config.eos.teleportContract,
+                table: 'teleports',
+                lower_bound: data.id,
+                upper_bound: data.id,
+                limit: 1
+            });
+            // console.log(teleport_res);
+            if (!teleport_res.rows.length){
+                throw new Error(`Could not find teleport with id ${data.id}`);
+            }
+            const chain_data = teleport_res.rows[0];
+
+
+            // sign the transaction and send to the eos chain
+            const data_buf = Buffer.from(data_serialized);
+            const msg_hash = ethUtil.keccak(data_buf);
+            console.log(msg_hash.toString('hex'));
+            // console.log(this.config.eth.privateKey);
+            const pk = Buffer.from(this.config.eth.privateKey, "hex");
+            const sig = ethUtil.ecsign(msg_hash, pk);
+            // console.log(pk, sig);
+
+            const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
+            console.log(signature);
+
+            const actions = [{
+                account: config.eos.teleportContract,
+                name: 'sign',
+                authorization: [{
+                    actor: config.eos.oracleAccount,
+                    permission: config.eos.oraclePermission || 'active'
+                }],
+                data: {
+                    oracle_name: config.eos.oracleAccount,
+                    id: data.id,
+                    signature
+                }
+            }];
+
             const res = await eos_api.transact({actions}, {
                 blocksBehind: 3,
                 expireSeconds: 30,

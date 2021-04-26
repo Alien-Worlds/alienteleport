@@ -89,8 +89,8 @@ class TraceHandler {
             console.log(`Sent confirmation with txid ${res.transaction_id}`);
         }
         catch (e){
-            console.error(`Error pushing confirmation ${e.message}`);
             if (e.message.indexOf('Oracle has already signed') === -1){
+                console.error(`Error pushing confirmation ${e.message}`);
                 setTimeout(() => {
                     this.sendSignature(data, data_serialized, ++retries);
                 }, 1000 * retries + 1);

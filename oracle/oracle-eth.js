@@ -109,9 +109,13 @@ const eventValue = (eventData, name) => {
 
 const getActionFromEvent = (event, confirmed = false) => {
     // console.log(event)
+    const tokens = eventValue(event.data, 'tokens');
+    if (tokens <= 0){
+        throw new Error('Tokens are less than or equal to 0');
+    }
     const to = eventValue(event.data, 'to');
     const chain_id = eventValue(event.data, 'chainId');
-    const amount = (eventValue(event.data, 'tokens') / Math.pow(10, config.precision)).toFixed(config.precision);
+    const amount = (tokens / Math.pow(10, config.precision)).toFixed(config.precision);
     const quantity = `${amount} ${config.symbol}`
     const txid = event.transactionHash.replace(/^0x/, '');
 
@@ -135,14 +139,14 @@ const getActionFromEvent = (event, confirmed = false) => {
 
 
 const sendConfirmation = async (event) => {
-    console.log(`Waiting for confirmed tx ${event.transactionHash}`);
-    await waitTransaction(web3, event.transactionHash, {blocksToWait: 5, internal: 5000});
-    console.log(`Tx ${event.transactionHash} confirmed`);
-    const action = getActionFromEvent(event, true);
-    const actions = [action];
-    // console.log(action.data)
-
     try {
+        console.log(`Waiting for confirmed tx ${event.transactionHash}`);
+        await waitTransaction(web3, event.transactionHash, {blocksToWait: 5, internal: 5000});
+        console.log(`Tx ${event.transactionHash} confirmed`);
+        const action = getActionFromEvent(event, true);
+        const actions = [action];
+        // console.log(action.data)
+
         const res = await eos_api.transact({actions}, {
             blocksBehind: 3,
             expireSeconds: 30,
@@ -152,7 +156,7 @@ const sendConfirmation = async (event) => {
     catch (e){
         console.error(`Error pushing confirmation ${e.message}`);
 
-        if (e.message.indexOf('already completed') === -1){
+        if (e.message.indexOf('already completed') === -1 && e.message.indexOf('Tokens are less than or equal to 0')){
             const rand = Math.random() * 20;
             setTimeout(() => {
                 sendConfirmation(event);

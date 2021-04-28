@@ -177,11 +177,11 @@ const handleLog = async (log) => {
 
     switch (eventData.name){
         case 'Teleport':
-            teleport_last_block = log.blockNumber;
-            const action = getActionFromEvent(log);
-            actions.push(action);
-
             try {
+                teleport_last_block = log.blockNumber;
+                const action = getActionFromEvent(log);
+                actions.push(action);
+
                 const res = await eos_api.transact({actions}, {
                     blocksBehind: 3,
                     expireSeconds: 30,
@@ -189,7 +189,7 @@ const handleLog = async (log) => {
                 console.log(`Sent notification of teleport with txid ${res.transaction_id}`);
             }
             catch (e){
-                console.error(`Error pushing notification ${e.message}`);
+                console.error(`Failure in Teleport Event ${e.message}`);
             }
 
             console.log(`Starting process to wait for confirmation for ${log.transactionHash}`);
@@ -197,27 +197,27 @@ const handleLog = async (log) => {
 
             break;
         case 'Claimed':
-            claimed_last_block = log.blockNumber;
-            const id = eventValue(eventData.events, 'id');
-            const to_eth = eventValue(eventData.events, 'to').replace('0x', '') + '000000000000000000000000'
-            const quantity = (eventValue(eventData.events, 'tokens') / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol;
-
-            actions.push({
-                account: config.eos.teleportContract,
-                name: 'claimed',
-                authorization: [{
-                    actor: config.eos.oracleAccount,
-                    permission: config.eos.oraclePermission || 'active'
-                }],
-                data: {
-                    oracle_name: config.eos.oracleAccount,
-                    id,
-                    to_eth,
-                    quantity
-                }
-            });
-
             try {
+                claimed_last_block = log.blockNumber;
+                const id = eventValue(eventData.events, 'id');
+                const to_eth = eventValue(eventData.events, 'to').replace('0x', '') + '000000000000000000000000'
+                const quantity = (eventValue(eventData.events, 'tokens') / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol;
+
+                actions.push({
+                    account: config.eos.teleportContract,
+                    name: 'claimed',
+                    authorization: [{
+                        actor: config.eos.oracleAccount,
+                        permission: config.eos.oraclePermission || 'active'
+                    }],
+                    data: {
+                        oracle_name: config.eos.oracleAccount,
+                        id,
+                        to_eth,
+                        quantity
+                    }
+                });
+
                 const res = await eos_api.transact({actions}, {
                     blocksBehind: 3,
                     expireSeconds: 30,

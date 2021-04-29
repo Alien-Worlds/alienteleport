@@ -31,10 +31,22 @@ const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder()
 class TraceHandler {
     constructor({config}) {
         this.config = config;
+        this.queue = [];
+        setInterval(this.processQueue.bind(this), 1000);
     }
 
-    async sendSignature(data, data_serialized, retries=0) {
-        console.log(data, data_serialized, Buffer.from(data_serialized).toString('hex'));
+    async processQueue() {
+        if (!this.queue.length){
+            return;
+        }
+        console.log(this.queue)
+        const item = this.queue.pop();
+        console.log(`Process item ${JSON.stringify(item)}`);
+
+        const data = item.data;
+        const data_serialized = item.data_serialized;
+        let retries = item.retries;
+
         if (retries > 10){
             console.error(`Exceeded retries`);
             return;
@@ -42,8 +54,8 @@ class TraceHandler {
 
         try {
             const teleport_res = await rpc.get_table_rows({
-                code: this.config.eos.teleportContract,
-                scope: this.config.eos.teleportContract,
+                code: config.eos.teleportContract,
+                scope: config.eos.teleportContract,
                 table: 'teleports',
                 lower_bound: data.id,
                 upper_bound: data.id,
@@ -66,7 +78,7 @@ class TraceHandler {
             // console.log(pk, sig);
 
             const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
-            console.log(signature);
+            console.log(`Created signature ${signature}`);
 
             const actions = [{
                 account: config.eos.teleportContract,
@@ -82,9 +94,10 @@ class TraceHandler {
                 }
             }];
 
+            console.log('Sending signature');
             const res = await eos_api.transact({actions}, {
                 blocksBehind: 3,
-                expireSeconds: 30,
+                expireSeconds: 90,
             });
             console.log(`Sent confirmation with txid ${res.transaction_id}`);
         }
@@ -92,10 +105,20 @@ class TraceHandler {
             if (e.message.indexOf('Oracle has already signed') === -1){
                 console.error(`Error pushing confirmation ${e.message}`);
                 setTimeout(() => {
-                    this.sendSignature(data, data_serialized, ++retries);
+                    item.retries++;
+                    queue.push(item);
+                    // this.sendSignature(data, data_serialized, ++retries);
                 }, 1000 * retries + 1);
             }
+            else {
+                console.log(`Already signed`)
+            }
         }
+    }
+
+    async sendSignature(data, data_serialized, retries=0) {
+        console.log(data, data_serialized, Buffer.from(data_serialized).toString('hex'));
+        this.queue.push({data, data_serialized, retries});
 
         // verify signature
         /*var sigDecoded = ethUtil.fromRpcSig(signature)

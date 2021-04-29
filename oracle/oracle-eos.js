@@ -106,7 +106,7 @@ class TraceHandler {
                 console.error(`Error pushing confirmation ${e.message}`);
                 setTimeout(() => {
                     item.retries++;
-                    queue.push(item);
+                    this.queue.push(item);
                     // this.sendSignature(data, data_serialized, ++retries);
                 }, 1000 * retries + 1);
             }

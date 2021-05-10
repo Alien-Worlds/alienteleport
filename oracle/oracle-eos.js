@@ -32,14 +32,16 @@ class TraceHandler {
     constructor({config}) {
         this.config = config;
         this.queue = [];
+        this.processingQueue = false;
         setInterval(this.processQueue.bind(this), 1000);
     }
 
     async processQueue() {
-        if (!this.queue.length){
+        if (!this.queue.length || this.processingQueue){
             return;
         }
-        console.log(this.queue)
+        this.processingQueue = true;
+        console.log(this.queue.length + ' items in the queue')
         const item = this.queue.pop();
         console.log(`Process item ${JSON.stringify(item)}`);
 
@@ -47,7 +49,7 @@ class TraceHandler {
         const data_serialized = item.data_serialized;
         let retries = item.retries;
 
-        if (retries > 10){
+        if (retries > 20){
             console.error(`Exceeded retries`);
             return;
         }
@@ -97,8 +99,9 @@ class TraceHandler {
             console.log('Sending signature');
             const res = await eos_api.transact({actions}, {
                 blocksBehind: 3,
-                expireSeconds: 90,
+                expireSeconds: 180
             });
+            console.log(res);
             console.log(`Sent confirmation with txid ${res.transaction_id}`);
         }
         catch (e){
@@ -111,9 +114,11 @@ class TraceHandler {
                 }, 1000 * retries + 1);
             }
             else {
-                console.log(`Already signed`)
+                console.log(`Already signed ${e.message}`)
             }
         }
+
+        this.processingQueue = false;
     }
 
     async sendSignature(data, data_serialized, retries=0) {

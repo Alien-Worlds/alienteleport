@@ -15,6 +15,7 @@ const {Api, JsonRpc, Serialize} = require('eosjs');
 const { JsSignatureProvider } = require('eosjs/dist/eosjs-jssig');
 const fetch = require('node-fetch');
 const { TextDecoder, TextEncoder } = require('text-encoding');
+const { fork } = require('child_process');
 
 const Web3 = require('web3');
 const ethUtil = require('ethereumjs-util');
@@ -25,6 +26,8 @@ const web3 = new Web3(new Web3.providers.HttpProvider(config.eth.endpoint));
 const signatureProvider = new JsSignatureProvider([config.eos.privateKey]);
 const rpc = new JsonRpc(config.eos.endpoint, {fetch});
 const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder(), textEncoder: new TextEncoder() });
+
+let tx_dispatcher = null;
 
 // const ethAbi = require(`./eth_abi`);
 
@@ -40,6 +43,10 @@ class TraceHandler {
         if (!this.queue.length || this.processingQueue){
             return;
         }
+        if (!tx_dispatcher){
+            console.log(`No dispatcher yet`);
+        }
+
         this.processingQueue = true;
         console.log(this.queue.length + ' items in the queue')
         const item = this.queue.pop();
@@ -97,25 +104,16 @@ class TraceHandler {
             }];
 
             console.log('Sending signature');
-            const res = await eos_api.transact({actions}, {
-                blocksBehind: 3,
-                expireSeconds: 180
-            });
-            console.log(res);
-            console.log(`Sent confirmation with txid ${res.transaction_id}`);
+
+            tx_dispatcher.send(JSON.stringify(actions));
         }
         catch (e){
-            if (e.message.indexOf('Oracle has already signed') === -1){
-                console.error(`Error pushing confirmation ${e.message}`);
-                setTimeout(() => {
-                    item.retries++;
-                    this.queue.push(item);
-                    // this.sendSignature(data, data_serialized, ++retries);
-                }, 1000 * retries + 1);
-            }
-            else {
-                console.log(`Already signed ${e.message}`)
-            }
+            console.error(`Error pushing confirmation ${e.message}`);
+            setTimeout(() => {
+                item.retries++;
+                this.queue.push(item);
+                // this.sendSignature(data, data_serialized, ++retries);
+            }, 1000 * retries + 1);
         }
 
         this.processingQueue = false;
@@ -188,6 +186,21 @@ const run = async (config) => {
         const info = await rpc.get_info();
         start_block = info.head_block_num;
     }
+
+    console.log(`Starting tx dispatcher`);
+    tx_dispatcher = fork('./txdispatch', [JSON.stringify(config)]);
+    tx_dispatcher.on('message', (msg) => {
+        const json = JSON.parse(msg);
+        if (json.type === 'success'){
+            console.log(`Pushed confirmation with txid ${json.txid}`);
+        }
+        else if (json.type === 'error'){
+            console.error(`Error pushing signature ${json.message}`);
+            setTimeout(() => {
+                tx_dispatcher.send(JSON.stringify(json.actions));
+            }, 1000);
+        }
+    });
 
     start(config, start_block);
 }

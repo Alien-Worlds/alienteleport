@@ -149,7 +149,7 @@ const sendConfirmation = async (event) => {
 
         const res = await eos_api.transact({actions}, {
             blocksBehind: 3,
-            expireSeconds: 30,
+            expireSeconds: 180,
         });
         console.log(`Sent confirmation with txid ${res.transaction_id}`);
     }
@@ -184,7 +184,7 @@ const handleLog = async (log) => {
 
                 const res = await eos_api.transact({actions}, {
                     blocksBehind: 3,
-                    expireSeconds: 30,
+                    expireSeconds: 180,
                 });
                 console.log(`Sent notification of teleport with txid ${res.transaction_id}`);
             }
@@ -220,7 +220,7 @@ const handleLog = async (log) => {
 
                 const res = await eos_api.transact({actions}, {
                     blocksBehind: 3,
-                    expireSeconds: 30,
+                    expireSeconds: 180,
                 });
                 console.log(`Sent notification of claim with txid ${res.transaction_id}`);
             }

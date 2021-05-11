@@ -21,8 +21,6 @@
                 blocksBehind: 3,
                 expireSeconds: 180
             });
-            console.log(res);
-            console.log(`Sent confirmation with txid ${res.transaction_id}`);
 
             process.send(JSON.stringify({ type:'success', actions, txid: res.transaction_id }));
         }

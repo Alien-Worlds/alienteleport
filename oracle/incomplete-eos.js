@@ -53,16 +53,22 @@ const run = async () => {
     // console.log(incomplete);
 
     for (let i = 0; i < incomplete.length; i++){
-        const url = `${hyperion_endpoint}/v2/history/get_actions?account=${incomplete[i].account}&filter=other.worlds:teleport&count=100`;
-        const res = await fetch(url);
-        const json = await res.json();
-        // console.log(json.actions[0])
-        const missed = json.actions.map(a => {
-            return {act: a.act, block_num: a.block_num}
-        }).filter(t => t.act.data.quantity === incomplete[i].quantity && t.act.data.eth_address.toLowerCase() === incomplete[i].eth_address.toLowerCase());
+        try {
+            const url = `${hyperion_endpoint}/v2/history/get_actions?account=${incomplete[i].account}&filter=other.worlds:teleport&count=100`;
+            const res = await fetch(url);
+            const json = await res.json();
+            // console.log(json.actions[0])
+            const missed = json.actions.map(a => {
+                return {act: a.act, block_num: a.block_num}
+            }).filter(t => t.act.data.quantity === incomplete[i].quantity && t.act.data.eth_address.toLowerCase() === incomplete[i].eth_address.toLowerCase());
 
-        if (missed.length){
-            console.log(`${incomplete[i].account} - ${incomplete[i].id}, oracles : ${JSON.stringify(incomplete[i].oracles)}, amount : ${incomplete[i].quantity}, block_num : ${missed[0].block_num}`);
+            if (missed.length){
+                console.log(`${incomplete[i].account} - ${incomplete[i].id}, oracles : ${JSON.stringify(incomplete[i].oracles)}, amount : ${incomplete[i].quantity}, block_num : ${missed[0].block_num}`);
+            }
+        }
+        catch (e) {
+            // console.error(e.message);
+            i--;
         }
         // console.log(incomplete[i], JSON.stringify(missed), missed.act, missed.block_num);
     }

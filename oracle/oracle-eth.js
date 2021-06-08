@@ -168,12 +168,15 @@ const sendConfirmation = async (event) => {
 
 let claimed_last_block = null;
 let teleport_last_block = null;
+let reconnect_errors = 0;
+
 const handleLog = async (log) => {
     const eventData = abiDecoder.decodeLogs([log])[0];
     log.data = eventData.events;
     const actions = [];
 
-    console.log('Handle Log', log)
+    console.log('Handle Log', log);
+    reconnect_errors = 0;
 
     switch (eventData.name){
         case 'Teleport':
@@ -187,14 +190,13 @@ const handleLog = async (log) => {
                     expireSeconds: 180,
                 });
                 console.log(`Sent notification of teleport with txid ${res.transaction_id}`);
+
+                console.log(`Starting process to wait for confirmation for ${log.transactionHash}`);
+                sendConfirmation(log);
             }
             catch (e){
                 console.error(`Failure in Teleport Event ${e.message}`);
             }
-
-            console.log(`Starting process to wait for confirmation for ${log.transactionHash}`);
-            sendConfirmation(log);
-
             break;
         case 'Claimed':
             try {
@@ -261,6 +263,22 @@ const unsubscribe_teleport = async () => {
     });
 }
 
+let resubscribe_timeout = null;
+const resubscribe = async (config) => {
+    if (resubscribe_timeout){
+        console.log('Already waiting for resubscribe');
+        return;
+    }
+    console.log('Resubscribe');
+    reconnect_errors++;
+    const delay = Math.pow(1.3, reconnect_errors) * 1000;
+    console.log(`Reconnecting in ${delay / 1000} seconds`);
+    resubscribe_timeout = setTimeout(() => {
+        resubscribe_timeout = null;
+        subscribe(config);
+    }, delay);
+}
+
 const subscribe = async (config) => {
     console.log('subscribing to all events');
     await unsubscribe_claimed();
@@ -269,23 +287,25 @@ const subscribe = async (config) => {
     claimed_subscription = web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [claimed_topic]}, function(err, res){
         if (err){
             console.error(`Error subscribing to claim logs ${err.message}`);
+
+            resubscribe(config);
         }
     }).on("data", handleLog).on("error", async (e) => {
-        console.log('Error in claimed log listener', e);
-        await unsubscribe_claimed();
-        await unsubscribe_teleport();
-        subscribe(config);
+        console.log('Error in claimed log listener', e.message);
+
+        await resubscribe(config);
     });
 
     teleport_subscription = web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [teleport_topic]}, function(err, res){
         if (err){
             console.error(`Error subscribing to teleport logs ${err.message}`);
+
+            resubscribe(config);
         }
     }).on("data", handleLog).on("error", async (e) => {
-        console.log('Error in teleport log listener', e);
-        await unsubscribe_claimed();
-        await unsubscribe_teleport();
-        subscribe(config);
+        console.log('Error in teleport log listener', e.message);
+
+        await resubscribe(config);
     });
 }
 

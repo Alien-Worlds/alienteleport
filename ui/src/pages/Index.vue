@@ -186,6 +186,11 @@
                         <div class="sky"></div>
                         <div class="fade"></div>
                     </div>
+
+                    <!-- -------------------Announce bar------------------- -->
+                    <div class="announcebar">
+                      BSC to WAX Teleports are experiencing longer than usual travel times. Please do not Teleport time-sensitive transfers. <a href="https://alienworlds.zendesk.com/hc/en-us/articles/1500012591482-Delays-in-BSC-to-WAX-Teleport" target="_blank">Known Issue can be found here.</a>
+                    </div>
                 </div>
             </div>
 

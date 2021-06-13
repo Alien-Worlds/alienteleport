@@ -391,7 +391,7 @@ p {
     background: radial-gradient(ellipse at center, rgba(51, 51, 51, 0.8) 0%, rgba(33, 33, 33, 0) 100%);
 
     /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
-    filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#333333', endColorstr='#00212121',GradientType=1 );
+    filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#333333', endColorstr='#00212121', GradientType=1);
 
     /* IE6-9 fallback on horizontal gradient */
   }
@@ -532,7 +532,8 @@ p {
         letter-spacing: 1px;
       }
 
-      .close.button {}
+      .close.button {
+      }
     }
   }
 }
@@ -748,7 +749,7 @@ input[type=text] {
   background: linear-gradient(45deg, rgba(17, 17, 17, 1) 0%, rgba(17, 17, 17, 0) 100%);
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
-  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#111111', endColorstr='#00111111',GradientType=1 );
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#111111', endColorstr='#00111111', GradientType=1);
 
   /* IE6-9 fallback on horizontal gradient */
 }
@@ -780,7 +781,7 @@ input[type=text] {
   background: linear-gradient(135deg, rgba(65, 198, 206, 0.5) 50%, rgba(200, 153, 80, 0.6) 100%);
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
-  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#8041c6ce', endColorstr='#99c89950',GradientType=1 );
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#8041c6ce', endColorstr='#99c89950', GradientType=1);
 
   /* IE6-9 fallback on horizontal gradient */
 }
@@ -804,7 +805,7 @@ input[type=text] {
   background: linear-gradient(135deg, rgba(31, 145, 211, 0.5) 31%, rgba(101, 101, 101, 0.6) 100%);
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
-  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#801f91d3', endColorstr='#99656565',GradientType=1 );
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#801f91d3', endColorstr='#99656565', GradientType=1);
 
   /* IE6-9 fallback on horizontal gradient */
 }
@@ -829,7 +830,7 @@ input[type=text] {
   background: linear-gradient(45deg, rgba(247, 143, 27, 0.5) 11%, rgba(101, 101, 101, 0.2) 100%);
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
-  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#50f78f1b', endColorstr='#99656565',GradientType=1 );
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#50f78f1b', endColorstr='#99656565', GradientType=1);
 
   /* IE6-9 fallback on horizontal gradient */
 }
@@ -854,7 +855,7 @@ input[type=text] {
   background: linear-gradient(45deg, rgba(197, 191, 38, 0.8) 10%, rgba(247, 143, 27, 0.3) 50%);
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
-  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#80c5bf26', endColorstr='#30f78f1b',GradientType=1 );
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#80c5bf26', endColorstr='#30f78f1b', GradientType=1);
 
   /* IE6-9 fallback on horizontal gradient */
 }
@@ -879,7 +880,7 @@ input[type=text] {
   background: linear-gradient(135deg, rgba(27, 208, 247, 0.5) 0%, rgba(255, 166, 50, 0.2) 100%);
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
-  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#501bd0f7', endColorstr='#99ffa632',GradientType=1 );
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#501bd0f7', endColorstr='#99ffa632', GradientType=1);
 
   /* IE6-9 fallback on horizontal gradient */
 }
@@ -904,7 +905,7 @@ input[type=text] {
   background: linear-gradient(135deg, rgba(255, 186, 0, 0.3) 10%, rgba(120, 38, 197, 0.8) 90%);
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
-  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#30ffba00', endColorstr='#807826c5',GradientType=1 );
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#30ffba00', endColorstr='#807826c5', GradientType=1);
 
   /* IE6-9 fallback on horizontal gradient */
 }
@@ -1149,7 +1150,8 @@ form.amount.error {
   }
 }
 
-.login .wax {}
+.login .wax {
+}
 
 .profile .login {
   .notlogged, .islogged {
@@ -1872,5 +1874,37 @@ p.notice, p.error {
   .btns .button {
     display: block;
     margin-bottom: 2vh;
+  }
+}
+
+.announcebar {
+  position: fixed;
+  width: 100%;
+  left: 0;
+  bottom: 0;
+  padding: 1%;
+  background-color: #ff3b52;
+  color: #FFF;
+  text-align: center;
+  transform: translateY(200px);
+  animation: barin 2s forwards ease-out;
+  z-index: 99999;
+  font-weight: 500;
+}
+
+.announcebar a {
+  color: #FFF;
+  font-family: 'Titillium Web', sans-serif;
+}
+
+.announcebar a:hover {
+  opacity: .6;
+}
+
+@keyframes barin {
+  0% {
+  }
+  100% {
+    transform: translateY(0px);
   }
 }

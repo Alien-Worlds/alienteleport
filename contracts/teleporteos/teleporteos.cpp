@@ -6,7 +6,8 @@ teleporteos::teleporteos(name s, name code, datastream<const char *> ds) : contr
                                                                            _deposits(get_self(), get_self().value),
                                                                            _oracles(get_self(), get_self().value),
                                                                            _receipts(get_self(), get_self().value),
-                                                                           _teleports(get_self(), get_self().value) {}
+                                                                           _teleports(get_self(), get_self().value),
+                                                                           _cancels(get_self(), get_self().value) {}
 
 /* Notifications for tlm transfer */
 void teleporteos::transfer(name from, name to, asset quantity, string memo) {
@@ -90,6 +91,35 @@ void teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checksum
         permission_level{get_self(), "active"_n},
         get_self(), "logteleport"_n,
         make_tuple(next_teleport_id, now, from, quantity, chain_id, eth_address)
+    ).send();
+}
+
+/* Cancels a teleport after 30 days and no claim */
+void teleporteos::cancel(uint64_t id) {
+    auto teleport = _teleports.find(id);
+    check(teleport != _teleports.end(), "Teleport not found");
+
+    require_auth(teleport->account);
+    check(!teleport->claimed, "Teleport is already claimed");
+
+    /* wait 32 days to give time to mark as claimed */
+    uint32_t thirty_two_days = 60 * 60 * 24 * 32;
+    uint32_t now = current_time_point().sec_since_epoch();
+    check((teleport->time + thirty_two_days) < now, "Teleport has not expired");
+
+    // Refund the teleport and mark it as cancelled
+    auto existing = _cancels.find(id);
+    check(existing == _cancels.end(), "Teleport has already been cancelled");
+
+    _cancels.emplace(teleport->account, [&](auto &c){
+        c.teleport_id = id;
+    });
+
+    string memo = "Cancel teleport";
+    action(
+        permission_level{get_self(), "active"_n},
+        TOKEN_CONTRACT, "transfer"_n,
+        make_tuple(get_self(), teleport->account, teleport->quantity, memo)
     ).send();
 }
 

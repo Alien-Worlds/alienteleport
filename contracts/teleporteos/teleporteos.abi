@@ -4,6 +4,26 @@
     "types": [],
     "structs": [
         {
+            "name": "cancel",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "cancel_item",
+            "base": "",
+            "fields": [
+                {
+                    "name": "teleport_id",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
             "name": "claimed",
             "base": "",
             "fields": [
@@ -280,6 +300,11 @@
     ],
     "actions": [
         {
+            "name": "cancel",
+            "type": "cancel",
+            "ricardian_contract": ""
+        },
+        {
             "name": "claimed",
             "type": "claimed",
             "ricardian_contract": ""
@@ -331,6 +356,13 @@
         }
     ],
     "tables": [
+        {
+            "name": "cancels",
+            "type": "cancel_item",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
         {
             "name": "deposits",
             "type": "deposit_item",

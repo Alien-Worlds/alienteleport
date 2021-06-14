@@ -10,201 +10,88 @@ process.title = `oracle-eth ${process.env['CONFIG']}`;
 
 const {Api, JsonRpc} = require('eosjs');
 const {TextDecoder, TextEncoder} = require('text-encoding');
-const Web3 = require('web3');
-const ethUtil = require('ethereumjs-util');
-const abiDecoder = require('abi-decoder');
-
 const {JsSignatureProvider} = require('eosjs/dist/eosjs-jssig');
 const fetch = require('node-fetch');
+const fs = require('fs');
+const ethers = require('ethers');
 
 const config = require(process.env['CONFIG'] || './config');
 
-const ethAbi = require(`./eth_abi`);
-abiDecoder.addABI(ethAbi);
+const provider = new ethers.providers.JsonRpcProvider(config.eth.endpoint);
 
-const web3 = new Web3(new Web3.providers.WebsocketProvider(config.eth.wsEndpoint, {clientConfig:{maxReceivedFrameSize: 10000000000,maxReceivedMessageSize: 10000000000}}));
-const contract = new web3.eth.Contract(ethAbi, config.eth.teleportContract);
 const signatureProvider = new JsSignatureProvider([config.eos.privateKey]);
 const rpc = new JsonRpc(config.eos.endpoint, {fetch});
 const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder(), textEncoder: new TextEncoder() });
 
-const DEFAULT_INTERVAL = 5000;
+const blocks_file = `.oracle_eth_block-${config.eos.oracleAccount}`;
 const DEFAULT_BLOCKS_TO_WAIT = 5;
+const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
+const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
 
-const waitTransaction = async (web3, txnHash, options) =>  {
-    const interval = options && options.interval ? options.interval : DEFAULT_INTERVAL;
-    const blocksToWait =
-        options && options.blocksToWait
-            ? options.blocksToWait
-            : DEFAULT_BLOCKS_TO_WAIT;
-    const transactionReceiptAsync = async function(txnHash, resolve, reject) {
-        try {
-            const receipt = web3.eth.getTransactionReceipt(txnHash);
-            if (!receipt) {
-                setTimeout(function() {
-                    transactionReceiptAsync(txnHash, resolve, reject);
-                }, interval);
-            } else {
-                if (blocksToWait > 0) {
-                    const resolvedReceipt = await receipt;
-                    if (!resolvedReceipt || !resolvedReceipt.blockNumber)
-                        setTimeout(function() {
-                            // this.logger.debug("Polling");
-                            transactionReceiptAsync(txnHash, resolve, reject);
-                        }, interval);
-                    else {
-                        try {
-                            const block = await web3.eth.getBlock(resolvedReceipt.blockNumber);
-                            const current = await web3.eth.getBlock("latest");
-                            if (current.number - block.number >= blocksToWait) {
-                                var txn = await web3.eth.getTransaction(txnHash);
-                                if (txn.blockNumber != null) resolve(resolvedReceipt);
-                                else
-                                    reject(
-                                        new Error(
-                                            "Transaction with hash: " +
-                                            txnHash +
-                                            " ended up in an uncle block."
-                                        )
-                                    );
-                            } else
-                                setTimeout(function() {
-                                    transactionReceiptAsync(txnHash, resolve, reject);
-                                }, interval);
-                        } catch (e) {
-                            setTimeout(function() {
-                                transactionReceiptAsync(txnHash, resolve, reject);
-                            }, interval);
-                        }
-                    }
-                } else resolve(receipt);
-            }
-        } catch (e) {
-            reject(e);
+const sleep = async (ms) => {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    })
+}
+
+const await_confirmation = async (txid) => {
+    return new Promise(async resolve => {
+        let resolved = false;
+        while (!resolved){
+            provider.getTransactionReceipt(txid).then(receipt => {
+                if (receipt && receipt.confirmations > DEFAULT_BLOCKS_TO_WAIT) {
+                    console.log(`TX ${txid} has ${receipt.confirmations} confirmations`);
+                    resolve(receipt);
+                    resolved = true;
+                }
+            });
+            await sleep(10000);
         }
-    };
-
-    // Resolve multiple transactions once
-    if (Array.isArray(txnHash)) {
-        var promises = [];
-        txnHash.forEach(function(oneTxHash) {
-            promises.push(waitTransaction(web3, oneTxHash, options));
-        });
-        return Promise.all(promises);
-    } else {
-        return new Promise(function(resolve, reject) {
-            transactionReceiptAsync(txnHash, resolve, reject);
-        });
-    }
+    });
 }
 
-const eventValue = (eventData, name) => {
-    let val = null;
-    const data = eventData.find(e => e.name === name);
-    if (data){
-        val = data.value;
-    }
-    return val;
-}
-
-const getActionFromEvent = (event, confirmed = false) => {
-    // console.log(event)
-    const tokens = eventValue(event.data, 'tokens');
-    if (tokens <= 0){
-        throw new Error('Tokens are less than or equal to 0');
-    }
-    const to = eventValue(event.data, 'to');
-    const chain_id = eventValue(event.data, 'chainId');
-    const amount = (tokens / Math.pow(10, config.precision)).toFixed(config.precision);
-    const quantity = `${amount} ${config.symbol}`
-    const txid = event.transactionHash.replace(/^0x/, '');
-
-    return {
-        account: config.eos.teleportContract,
-        name: 'received',
-        authorization: [{
-            actor: config.eos.oracleAccount,
-            permission: config.eos.oraclePermission || 'active'
-        }],
-        data: {
-            oracle_name: config.eos.oracleAccount,
-            to,
-            ref: txid,
-            quantity,
-            chain_id,
-            confirmed
+const load_block = async () => {
+    let block_number = 'latest';
+    if (fs.existsSync(blocks_file)){
+        const file_contents = await fs.readFileSync(blocks_file);
+        if (file_contents){
+            block_number = parseInt(file_contents);
+            if (isNaN(block_number)){
+                block_number = 'latest';
+            }
+            else {
+                // for fresh start go back 50 blocks
+                block_number -= 50;
+            }
         }
     }
+
+    return block_number;
+}
+const save_block = async (block_num) => {
+    await fs.writeFileSync(blocks_file, block_num.toString());
 }
 
+const process_claimed = async (from_block, to_block) => {
+    return new Promise(async (resolve, reject) => {
+        const query = {
+            fromBlock: from_block,
+            toBlock: to_block,
+            address: config.eth.teleportContract,
+            topics: [claimed_topic]
+        };
+        // console.log(query);
+        const res = await provider.getLogs(query);
+        // console.log(res);
+        if (res.length){
+            for (let r = 0; r < res.length; r++){
+                const data = await ethers.utils.defaultAbiCoder.decode([ 'uint64', 'address', 'uint' ], res[r].data);
 
-const sendConfirmation = async (event) => {
-    try {
-        console.log(`Waiting for confirmed tx ${event.transactionHash}`);
-        await waitTransaction(web3, event.transactionHash, {blocksToWait: 5, internal: 5000});
-        console.log(`Tx ${event.transactionHash} confirmed`);
-        const action = getActionFromEvent(event, true);
-        const actions = [action];
-        // console.log(action.data)
-
-        const res = await eos_api.transact({actions}, {
-            blocksBehind: 3,
-            expireSeconds: 180,
-        });
-        console.log(`Sent confirmation with txid ${res.transaction_id}`);
-    }
-    catch (e){
-        console.error(`Error pushing confirmation ${e.message}`);
-
-        if (e.message.indexOf('already completed') === -1 && e.message.indexOf('Tokens are less than or equal to 0')){
-            const rand = Math.random() * 20;
-            setTimeout(() => {
-                sendConfirmation(event);
-            }, rand * 1000);
-        }
-    }
-}
-
-
-let claimed_last_block = null;
-let teleport_last_block = null;
-let reconnect_errors = 0;
-
-const handleLog = async (log) => {
-    const eventData = abiDecoder.decodeLogs([log])[0];
-    log.data = eventData.events;
-    const actions = [];
-
-    console.log('Handle Log', log);
-    reconnect_errors = 0;
-
-    switch (eventData.name){
-        case 'Teleport':
-            try {
-                teleport_last_block = log.blockNumber;
-                const action = getActionFromEvent(log);
-                actions.push(action);
-
-                const res = await eos_api.transact({actions}, {
-                    blocksBehind: 3,
-                    expireSeconds: 180,
-                });
-                console.log(`Sent notification of teleport with txid ${res.transaction_id}`);
-
-                console.log(`Starting process to wait for confirmation for ${log.transactionHash}`);
-                sendConfirmation(log);
-            }
-            catch (e){
-                console.error(`Failure in Teleport Event ${e.message}`);
-            }
-            break;
-        case 'Claimed':
-            try {
-                claimed_last_block = log.blockNumber;
-                const id = eventValue(eventData.events, 'id');
-                const to_eth = eventValue(eventData.events, 'to').replace('0x', '') + '000000000000000000000000'
-                const quantity = (eventValue(eventData.events, 'tokens') / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol;
-
+                // console.log(res[r], data, data[1].toString());
+                const id = data[0].toNumber();
+                const to_eth = data[1].replace('0x', '') + '000000000000000000000000';
+                const quantity = (data[2].toNumber() / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol;
+                const actions = [];
                 actions.push({
                     account: config.eos.teleportContract,
                     name: 'claimed',
@@ -219,104 +106,165 @@ const handleLog = async (log) => {
                         quantity
                     }
                 });
+                // console.log(actions, res[r].transactionHash);
 
-                const res = await eos_api.transact({actions}, {
-                    blocksBehind: 3,
-                    expireSeconds: 180,
+                await_confirmation(res[r].transactionHash).then(async () => {
+                    try {
+                        const eos_res = await eos_api.transact({actions}, {
+                            blocksBehind: 3,
+                            expireSeconds: 180,
+                        });
+                        console.log(`Sent notification of claim with txid ${eos_res.transaction_id}, for ID ${id}, account 0x${to_eth.substr(0, 40)}, quantity ${quantity}`);
+                        // resolve();
+                    }
+                    catch (e){
+                        if (e.message.indexOf('Already marked as claimed') > -1){
+                            console.log(`ID ${id} is already claimed, account 0x${to_eth.substr(0, 40)}, quantity ${quantity}`);
+                        }
+                        else {
+                            console.error(`Error sending confirm ${e.message}`);
+                            // reject(e);
+                        }
+                    }
                 });
-                console.log(`Sent notification of claim with txid ${res.transaction_id}`);
+
+                await sleep(500);
             }
-            catch (e){
-                console.error(`Error pushing claim confirmation ${e.message}`);
+        }
+
+        resolve();
+    });
+}
+
+const process_teleported = async (from_block, to_block) => {
+    return new Promise(async (resolve, reject) => {
+        const query = {
+            fromBlock: from_block,
+            toBlock: to_block,
+            address: config.eth.teleportContract,
+            topics: [teleport_topic]
+        };
+        // console.log(query);
+        const res = await provider.getLogs(query);
+        // console.log(res);
+        if (res.length){
+            for (let r = 0; r < res.length; r++){
+                const data = await ethers.utils.defaultAbiCoder.decode([ 'string', 'uint', 'uint' ], res[r].data);
+
+                // console.log(res[r], data, data[1].toString())
+
+                const tokens = data[1].toNumber();
+                if (tokens <= 0){
+                    // console.error(data);
+                    console.error('Tokens are less than or equal to 0');
+                    continue;
+                }
+                const to = data[0];
+                const chain_id = data[2].toNumber();
+                const amount = (tokens / Math.pow(10, config.precision)).toFixed(config.precision);
+                const quantity = `${amount} ${config.symbol}`
+                const txid = res[r].transactionHash.replace(/^0x/, '');
+
+                const actions = [];
+                actions.push({
+                    account: config.eos.teleportContract,
+                    name: 'received',
+                    authorization: [{
+                        actor: config.eos.oracleAccount,
+                        permission: config.eos.oraclePermission || 'active'
+                    }],
+                    data: {
+                        oracle_name: config.eos.oracleAccount,
+                        to,
+                        ref: txid,
+                        quantity,
+                        chain_id,
+                        confirmed: true
+                    }
+                });
+                // console.log(actions);
+
+                await_confirmation(res[r].transactionHash).then(async () => {
+                    try {
+                        const eos_res = await eos_api.transact({actions}, {
+                            blocksBehind: 3,
+                            expireSeconds: 180,
+                        });
+                        console.log(`Sent notification of teleport with txid ${eos_res.transaction_id}`);
+                        // resolve();
+                    }
+                    catch (e){
+                        if (e.message.indexOf('Oracle has already approved') > -1){
+                            console.log('Oracle has already approved');
+                        }
+                        else {
+                            console.error(`Error sending teleport ${e.message}`);
+                            // reject(e);
+                        }
+                    }
+                });
+
+                await sleep(500);
             }
-            break;
+        }
+
+        resolve();
+    })
+}
+
+const run = async (from_block = 'latest') => {
+    while (true){
+        try {
+            const block = await provider.getBlock('latest');
+            const latest_block = block.number;
+
+            if (from_block === 'latest'){
+                // load last seen block from file
+                from_block = await load_block();
+                if (from_block !== 'latest'){
+                    console.log(`Starting from save block of ${from_block}`)
+                }
+            }
+            if (from_block === 'latest'){
+                // could not get block from file and it wasn't specified (go back 100 blocks)
+                from_block = latest_block - 100;
+                // console.log(block, from_block)
+            }
+            let to_block = from_block + 100;
+            if (to_block > latest_block){
+                to_block = latest_block;
+            }
+
+            if (from_block >= latest_block){
+                console.log(`Up to date at block ${to_block}`);
+                await sleep(10000);
+            }
+            // const res = await tlm_contract.queryFilter(teleport_topic, -20000);
+            // let event = tlm_contract.interface.events['Claimed(uint64 id,address to,uint256 tokens)'];
+            // console.log(event)
+            console.log(`Getting events from block ${from_block} to ${to_block}`)
+
+            await process_claimed(from_block, to_block);
+            await process_teleported(from_block, to_block);
+
+            from_block = to_block;
+
+            // save last block received
+            await save_block(to_block);
+
+            if (latest_block - from_block <= 1000){
+                console.log('Waiting...');
+                await sleep(30000);
+            }
+            else {
+                console.log(`Not waiting... ${latest_block} - ${from_block}`);
+            }
+        }
+        catch (e){
+            console.error(e.message);
+        }
     }
 }
-
-let claimed_subscription = null;
-let teleport_subscription = null;
-const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
-const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
-
-const unsubscribe_claimed = async () => {
-    return new Promise((resolve) => {
-        if (claimed_subscription){
-            claimed_subscription.unsubscribe((err, success) => {
-                resolve()
-            });
-        }
-        else {
-            resolve()
-        }
-    });
-}
-const unsubscribe_teleport = async () => {
-    return new Promise((resolve) => {
-        if (teleport_subscription){
-            teleport_subscription.unsubscribe((err, success) => {
-                resolve()
-            });
-        }
-        else {
-            resolve()
-        }
-    });
-}
-
-let resubscribe_timeout = null;
-const resubscribe = async (config) => {
-    if (resubscribe_timeout){
-        console.log('Already waiting for resubscribe');
-        return;
-    }
-    console.log('Resubscribe');
-    reconnect_errors++;
-    const delay = Math.pow(1.3, reconnect_errors) * 1000;
-    console.log(`Reconnecting in ${delay / 1000} seconds`);
-    resubscribe_timeout = setTimeout(() => {
-        resubscribe_timeout = null;
-        subscribe(config);
-    }, delay);
-}
-
-const subscribe = async (config) => {
-    console.log('subscribing to all events');
-    await unsubscribe_claimed();
-    await unsubscribe_teleport();
-
-    claimed_subscription = web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [claimed_topic]}, function(err, res){
-        if (err){
-            console.error(`Error subscribing to claim logs ${err.message}`);
-
-            resubscribe(config);
-        }
-    }).on("data", handleLog).on("error", async (e) => {
-        console.log('Error in claimed log listener', e.message);
-
-        await resubscribe(config);
-    });
-
-    teleport_subscription = web3.eth.subscribe('logs', {fromBlock: start_block, address: config.eth.teleportContract, topics: [teleport_topic]}, function(err, res){
-        if (err){
-            console.error(`Error subscribing to teleport logs ${err.message}`);
-
-            resubscribe(config);
-        }
-    }).on("data", handleLog).on("error", async (e) => {
-        console.log('Error in teleport log listener', e.message);
-
-        await resubscribe(config);
-    });
-}
-
-const run = async (config, start_block = 'latest') => {
-    console.log(`Starting ETH watcher for EOS oracle ${config.eos.oracleAccount}, starting at ${start_block}`);
-
-    claimed_last_block = start_block;
-    teleport_last_block = start_block;
-
-    subscribe(config);
-};
 
 let start_block = 'latest';
 if (process.argv[2]){
@@ -335,6 +283,5 @@ else if (process.env['START_BLOCK']){
     }
     start_block = lb;
 }
-console.log(`Starting from block ${start_block}`);
 
-run(config, start_block);
+run(start_block);

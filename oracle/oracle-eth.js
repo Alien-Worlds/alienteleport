@@ -239,9 +239,6 @@ const run = async (from_block = 'latest') => {
                 console.log(`Up to date at block ${to_block}`);
                 await sleep(10000);
             }
-            // const res = await tlm_contract.queryFilter(teleport_topic, -20000);
-            // let event = tlm_contract.interface.events['Claimed(uint64 id,address to,uint256 tokens)'];
-            // console.log(event)
             console.log(`Getting events from block ${from_block} to ${to_block}`)
 
             await process_claimed(from_block, to_block);

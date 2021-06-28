@@ -23,7 +23,8 @@ const signatureProvider = new JsSignatureProvider([config.eos.privateKey]);
 const rpc = new JsonRpc(config.eos.endpoint, {fetch});
 const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder(), textEncoder: new TextEncoder() });
 
-const blocks_file = `.oracle_eth_block-${config.eos.oracleAccount}`;
+const network = config.network || 'ETH'
+const blocks_file = `.oracle_${config.network}_block-${config.eth.oracleAccount}`;
 const DEFAULT_BLOCKS_TO_WAIT = 5;
 const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
 const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';

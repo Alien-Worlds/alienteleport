@@ -1,6 +1,6 @@
 /* Fonts
 --------------------------------------------- */
-@import url('https://fonts.googleapis.com/css?family=Orbitron:wght@400;700&family=Titillium+Web:wght@200;300;400;700&display=swap');
+@import url("https://fonts.googleapis.com/css?family=Orbitron:wght@400;700&family=Titillium+Web:wght@200;300;400;700&display=swap");
 
 /* Baseline Normalize
 --------------------------------------------- */
@@ -16,11 +16,25 @@ body {
   margin: 0;
 }
 
-article, aside, details, figcaption, figure, footer, header, main, menu, nav, section, summary {
+article,
+aside,
+details,
+figcaption,
+figure,
+footer,
+header,
+main,
+menu,
+nav,
+section,
+summary {
   display: block;
 }
 
-audio, canvas, progress, video {
+audio,
+canvas,
+progress,
+video {
   display: inline-block;
 }
 
@@ -33,7 +47,8 @@ progress {
   vertical-align: baseline;
 }
 
-template, [hidden] {
+template,
+[hidden] {
   display: none;
 }
 
@@ -41,7 +56,8 @@ a {
   background-color: transparent;
   -webkit-text-decoration-skip: objects;
 
-  &:active, &:hover {
+  &:active,
+  &:hover {
     outline-width: 0;
   }
 }
@@ -52,11 +68,13 @@ abbr[title] {
   text-decoration: underline dotted;
 }
 
-b, strong {
+b,
+strong {
   font-weight: inherit;
 }
 
-b, strong {
+b,
+strong {
   font-weight: bolder;
 }
 
@@ -78,7 +96,8 @@ small {
   font-size: 80%;
 }
 
-sub, sup {
+sub,
+sup {
   font-size: 75%;
   line-height: 0;
   position: relative;
@@ -101,7 +120,10 @@ svg:not(:root) {
   overflow: hidden;
 }
 
-code, kbd, pre, samp {
+code,
+kbd,
+pre,
+samp {
   font-family: monospace, monospace;
   font-size: 1em;
 }
@@ -116,7 +138,11 @@ hr {
   overflow: visible;
 }
 
-button, input, optgroup, select, textarea {
+button,
+input,
+optgroup,
+select,
+textarea {
   font: inherit;
   margin: 0;
 }
@@ -125,24 +151,35 @@ optgroup {
   font-weight: bold;
 }
 
-button, input {
+button,
+input {
   overflow: visible;
 }
 
-button, select {
+button,
+select {
   text-transform: none;
 }
 
-button, html [type="button"], [type="reset"], [type="submit"] {
+button,
+html [type="button"],
+[type="reset"],
+[type="submit"] {
   -webkit-appearance: button;
 }
 
-button::-moz-focus-inner, [type="button"]::-moz-focus-inner, [type="reset"]::-moz-focus-inner, [type="submit"]::-moz-focus-inner {
+button::-moz-focus-inner,
+[type="button"]::-moz-focus-inner,
+[type="reset"]::-moz-focus-inner,
+[type="submit"]::-moz-focus-inner {
   border-style: none;
   padding: 0;
 }
 
-button:-moz-focusring, [type="button"]:-moz-focusring, [type="reset"]:-moz-focusring, [type="submit"]:-moz-focusring {
+button:-moz-focusring,
+[type="button"]:-moz-focusring,
+[type="reset"]:-moz-focusring,
+[type="submit"]:-moz-focusring {
   outline: 1px dotted ButtonText;
 }
 
@@ -165,13 +202,15 @@ textarea {
   overflow: auto;
 }
 
-[type="checkbox"], [type="radio"] {
+[type="checkbox"],
+[type="radio"] {
   box-sizing: border-box;
   padding: 0;
 }
 
 [type="number"] {
-  &::-webkit-inner-spin-button, &::-webkit-outer-spin-button {
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
     height: auto;
   }
 }
@@ -180,7 +219,8 @@ textarea {
   -webkit-appearance: textfield;
   outline-offset: -2px;
 
-  &::-webkit-search-cancel-button, &::-webkit-search-decoration {
+  &::-webkit-search-cancel-button,
+  &::-webkit-search-decoration {
     -webkit-appearance: none;
   }
 }
@@ -207,7 +247,8 @@ html {
 * {
   box-sizing: inherit;
 
-  &:before, &:after {
+  &:before,
+  &:after {
     box-sizing: inherit;
   }
 }
@@ -221,7 +262,15 @@ div {
 
 /* Updated 3-16-21 */
 
-nav, .item, .button, input[type=submit], .gradients, .fade, .back, .overlay, .type {
+nav,
+.item,
+.button,
+input[type="submit"],
+.gradients,
+.fade,
+.back,
+.overlay,
+.type {
   -webkit-transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   -moz-transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   -ms-transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -231,7 +280,10 @@ nav, .item, .button, input[type=submit], .gradients, .fade, .back, .overlay, .ty
 
 /* END 3-16-21 */
 
-.gradients, .planetbg, .enter, .accessed {
+.gradients,
+.planetbg,
+.enter,
+.accessed {
   -webkit-transition: all 1.5s cubic-bezier(0.25, 1, 0.5, 1);
   -moz-transition: all 1.5s cubic-bezier(0.25, 1, 0.5, 1);
   -ms-transition: all 1.5s cubic-bezier(0.25, 1, 0.5, 1);
@@ -247,7 +299,8 @@ nav, .item, .button, input[type=submit], .gradients, .fade, .back, .overlay, .ty
   transition: transform 2s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.dots, .sky {
+.dots,
+.sky {
   -webkit-transition: transform 2.5s cubic-bezier(0.25, 1, 0.5, 1);
   -moz-transition: transform 2.5s cubic-bezier(0.25, 1, 0.5, 1);
   -ms-transition: transform 2.5s cubic-bezier(0.25, 1, 0.5, 1);
@@ -263,24 +316,28 @@ nav, .item, .button, input[type=submit], .gradients, .fade, .back, .overlay, .ty
   transition: transform 2s ease-in-out;
 }
 
-.contents, .theinfo, .theplanet, .candidateswrap {
-  -webkit-transition: transform 1s cubic-bezier(0.25, 1, 0.5, 1), opacity 1s ease-out, width 1s cubic-bezier(0.25, 1, 0.5, 1);
+.contents,
+.theinfo,
+.theplanet,
+.candidateswrap {
+  -webkit-transition: transform 1s cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 1s ease-out, width 1s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 /* Basics
 --------------------------------------------- */
 
 body {
-  font-family: 'Titillium Web', sans-serif;
+  font-family: "Titillium Web", sans-serif;
   font-weight: 300;
   font-size: 18px;
   line-height: 32px;
   background-color: #212121;
-  color: #FFF;
+  color: #fff;
 }
 
 h1 {
-  font-family: 'Titillium Web', sans-serif;
+  font-family: "Titillium Web", sans-serif;
   font-weight: 200;
   font-size: 40px;
   text-transform: uppercase;
@@ -288,13 +345,13 @@ h1 {
 }
 
 h2 {
-  font-family: 'Orbitron', sans-serif;
+  font-family: "Orbitron", sans-serif;
   font-weight: 400;
   font-size: 30px;
 }
 
 h3 {
-  font-family: 'Orbitron', sans-serif;
+  font-family: "Orbitron", sans-serif;
   font-weight: 400;
   font-size: 30px;
   font-size: 40px;
@@ -302,19 +359,25 @@ h3 {
   letter-spacing: 4px;
 }
 
-h4, h5, h6 {
-  font-family: 'Titillium Web', sans-serif;
+h4,
+h5,
+h6 {
+  font-family: "Titillium Web", sans-serif;
   font-weight: 700;
   letter-spacing: 5px;
   font-size: 20px;
   text-transform: uppercase;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   margin: 0 0 5%;
 }
 
-h4, h5, h6 {
+h4,
+h5,
+h6 {
   margin: 0 0 2%;
 }
 
@@ -373,7 +436,7 @@ p {
   }
 
   &:after {
-    content: '';
+    content: "";
     display: block;
     top: 0;
     left: 0;
@@ -382,13 +445,27 @@ p {
     z-index: 0;
 
     /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#333333+0,212121+100&1+0,0+100 */
-    background: -moz-radial-gradient(center, ellipse cover, rgba(51, 51, 51, 0.8) 0%, rgba(33, 33, 33, 0) 100%);
+    background: -moz-radial-gradient(
+      center,
+      ellipse cover,
+      rgba(51, 51, 51, 0.8) 0%,
+      rgba(33, 33, 33, 0) 100%
+    );
 
     /* FF3.6-15 */
-    background: -webkit-radial-gradient(center, ellipse cover, rgba(51, 51, 51, 0.8) 0%, rgba(33, 33, 33, 0) 100%);
+    background: -webkit-radial-gradient(
+      center,
+      ellipse cover,
+      rgba(51, 51, 51, 0.8) 0%,
+      rgba(33, 33, 33, 0) 100%
+    );
 
     /* Chrome10-25,Safari5.1-6 */
-    background: radial-gradient(ellipse at center, rgba(51, 51, 51, 0.8) 0%, rgba(33, 33, 33, 0) 100%);
+    background: radial-gradient(
+      ellipse at center,
+      rgba(51, 51, 51, 0.8) 0%,
+      rgba(33, 33, 33, 0) 100%
+    );
 
     /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
     filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#333333', endColorstr='#00212121', GradientType=1);
@@ -493,7 +570,7 @@ p {
     }
 
     .icon {
-      background-image: url('images/alienworlds-icon-login.svg');
+      background-image: url("images/alienworlds-icon-login.svg");
     }
   }
 
@@ -503,7 +580,7 @@ p {
     }
 
     .icon {
-      background-image: url('images/alienworlds-icon-error.svg');
+      background-image: url("images/alienworlds-icon-error.svg");
     }
   }
 
@@ -513,7 +590,7 @@ p {
     }
 
     .icon {
-      background-image: url('images/alienworlds-icon-success.svg');
+      background-image: url("images/alienworlds-icon-success.svg");
     }
   }
 
@@ -546,16 +623,16 @@ p {
   }
 }
 
-input[type=text] {
+input[type="text"] {
   background-color: #212121;
   border: 2px solid #e0e0e0;
-  color: #FFF;
+  color: #fff;
   padding: 1vh 0.5vw;
 }
 
 .transfer {
-  input[type=text] {
-    font-family: 'Orbitron';
+  input[type="text"] {
+    font-family: "Orbitron";
     text-align: center;
     font-size: 28px;
     line-height: 36px;
@@ -579,7 +656,7 @@ input[type=text] {
 #starttransfer {
   .title span {
     &:before {
-      content: '';
+      content: "";
       display: inline;
     }
 
@@ -592,16 +669,22 @@ input[type=text] {
     }
   }
 
-  &.wax .title span.from:before, &.ethereum .title span.to:before, &.binance .title span.to:before, &.ethereum .title span.to:before, &.binance .title span.to:before {
-    content: 'WAX';
+  &.wax .title span.from:before,
+  &.ethereum .title span.to:before,
+  &.binance .title span.to:before,
+  &.ethereum .title span.to:before,
+  &.binance .title span.to:before {
+    content: "WAX";
   }
 
-  &.wax .title span.to.ethereum:before, &.ethereum .title span.from:before {
-    content: 'Ethereum';
+  &.wax .title span.to.ethereum:before,
+  &.ethereum .title span.from:before {
+    content: "Ethereum";
   }
 
-  &.wax .title span.to.binance:before, &.binance .title span.from:before {
-    content: 'Binance';
+  &.wax .title span.to.binance:before,
+  &.binance .title span.from:before {
+    content: "Binance";
   }
 }
 
@@ -625,15 +708,15 @@ input[type=text] {
   }
 
   .status {
-    font-family: 'Orbitron';
-    color: #FFF;
+    font-family: "Orbitron";
+    color: #fff;
     letter-spacing: 5px;
     font-size: 18px;
     margin-bottom: 2vh;
   }
 
   .amount {
-    font-family: 'Orbitron';
+    font-family: "Orbitron";
     color: #0ed4a8;
     font-size: 32px;
     margin-bottom: 2vh;
@@ -687,7 +770,8 @@ input[type=text] {
   }
 }
 
-.sky, .fade {
+.sky,
+.fade {
   position: absolute;
   width: 150vw;
   height: 150vh;
@@ -706,19 +790,19 @@ input[type=text] {
   }
 
   .grid {
-    background-image: url('images/alienworlds-teleport-bg-grid.svg');
+    background-image: url("images/alienworlds-teleport-bg-grid.svg");
     z-index: 3;
   }
 
   .lines {
-    background-image: url('images/alienworlds-teleport-bg-lines.svg');
+    background-image: url("images/alienworlds-teleport-bg-lines.svg");
     width: 175%;
     height: 175%;
     z-index: 2;
   }
 
   .dots {
-    background-image: url('images/alienworlds-teleport-bg-dots.svg');
+    background-image: url("images/alienworlds-teleport-bg-dots.svg");
     width: 250%;
     height: 250%;
     z-index: 4;
@@ -726,27 +810,39 @@ input[type=text] {
 }
 
 .sky {
-  background-image: url('images/alienworlds-teleport-bg-stars.jpg');
+  background-image: url("images/alienworlds-teleport-bg-stars.jpg");
   z-index: 0;
   width: 110%;
   height: 110%;
-  opacity: .8;
+  opacity: 0.8;
 }
 
 .fade {
   width: 100%;
   height: 100%;
   z-index: 1;
-  opacity: .7;
+  opacity: 0.7;
 
   /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#111111+0,111111+100&1+0,0+100 */
-  background: -moz-linear-gradient(45deg, rgba(17, 17, 17, 1) 0%, rgba(17, 17, 17, 0) 100%);
+  background: -moz-linear-gradient(
+    45deg,
+    rgba(17, 17, 17, 1) 0%,
+    rgba(17, 17, 17, 0) 100%
+  );
 
   /* FF3.6-15 */
-  background: -webkit-linear-gradient(45deg, rgba(17, 17, 17, 1) 0%, rgba(17, 17, 17, 0) 100%);
+  background: -webkit-linear-gradient(
+    45deg,
+    rgba(17, 17, 17, 1) 0%,
+    rgba(17, 17, 17, 0) 100%
+  );
 
   /* Chrome10-25,Safari5.1-6 */
-  background: linear-gradient(45deg, rgba(17, 17, 17, 1) 0%, rgba(17, 17, 17, 0) 100%);
+  background: linear-gradient(
+    45deg,
+    rgba(17, 17, 17, 1) 0%,
+    rgba(17, 17, 17, 0) 100%
+  );
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
   filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#111111', endColorstr='#00111111', GradientType=1);
@@ -757,7 +853,7 @@ input[type=text] {
 .gradients {
   position: absolute;
   z-index: 3;
-  opacity: .3;
+  opacity: 0.3;
 }
 
 .grad1 {
@@ -767,18 +863,30 @@ input[type=text] {
   bottom: 0;
   right: 0;
   z-index: 3;
-  opacity: .3;
+  opacity: 0.3;
   transform: translate(0vw, 0vw);
   clip-path: polygon(100% 0, 0% 100%, 100% 100%);
 
   /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#41c6ce+0,c89950+100&0.5+0,0.6+100 */
-  background: -moz-linear-gradient(-45deg, rgba(65, 198, 206, 0.5) 50%, rgba(200, 153, 80, 0.6) 100%);
+  background: -moz-linear-gradient(
+    -45deg,
+    rgba(65, 198, 206, 0.5) 50%,
+    rgba(200, 153, 80, 0.6) 100%
+  );
 
   /* FF3.6-15 */
-  background: -webkit-linear-gradient(-45deg, rgba(65, 198, 206, 0.5) 50%, rgba(200, 153, 80, 0.6) 100%);
+  background: -webkit-linear-gradient(
+    -45deg,
+    rgba(65, 198, 206, 0.5) 50%,
+    rgba(200, 153, 80, 0.6) 100%
+  );
 
   /* Chrome10-25,Safari5.1-6 */
-  background: linear-gradient(135deg, rgba(65, 198, 206, 0.5) 50%, rgba(200, 153, 80, 0.6) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(65, 198, 206, 0.5) 50%,
+    rgba(200, 153, 80, 0.6) 100%
+  );
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
   filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#8041c6ce', endColorstr='#99c89950', GradientType=1);
@@ -796,13 +904,25 @@ input[type=text] {
   clip-path: polygon(0 1%, 0% 100%, 100% 100%);
 
   /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#1f91d3+31,656565+100&0.5+31,0.6+100 */
-  background: -moz-linear-gradient(-45deg, rgba(31, 145, 211, 0.5) 31%, rgba(101, 101, 101, 0.6) 100%);
+  background: -moz-linear-gradient(
+    -45deg,
+    rgba(31, 145, 211, 0.5) 31%,
+    rgba(101, 101, 101, 0.6) 100%
+  );
 
   /* FF3.6-15 */
-  background: -webkit-linear-gradient(-45deg, rgba(31, 145, 211, 0.5) 31%, rgba(101, 101, 101, 0.6) 100%);
+  background: -webkit-linear-gradient(
+    -45deg,
+    rgba(31, 145, 211, 0.5) 31%,
+    rgba(101, 101, 101, 0.6) 100%
+  );
 
   /* Chrome10-25,Safari5.1-6 */
-  background: linear-gradient(135deg, rgba(31, 145, 211, 0.5) 31%, rgba(101, 101, 101, 0.6) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(31, 145, 211, 0.5) 31%,
+    rgba(101, 101, 101, 0.6) 100%
+  );
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
   filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#801f91d3', endColorstr='#99656565', GradientType=1);
@@ -821,13 +941,25 @@ input[type=text] {
   clip-path: polygon(70% 0, 100% 0, 30% 100%, 0 100%);
 
   /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#1f91d3+31,656565+100&0.5+31,0.6+100 */
-  background: -moz-linear-gradient(45deg, rgba(247, 143, 27, 0.5) 11%, rgba(101, 101, 101, 0.2) 100%);
+  background: -moz-linear-gradient(
+    45deg,
+    rgba(247, 143, 27, 0.5) 11%,
+    rgba(101, 101, 101, 0.2) 100%
+  );
 
   /* FF3.6-15 */
-  background: -webkit-linear-gradient(45deg, rgba(247, 143, 27, 0.5) 11%, rgba(101, 101, 101, 0.2) 100%);
+  background: -webkit-linear-gradient(
+    45deg,
+    rgba(247, 143, 27, 0.5) 11%,
+    rgba(101, 101, 101, 0.2) 100%
+  );
 
   /* Chrome10-25,Safari5.1-6 */
-  background: linear-gradient(45deg, rgba(247, 143, 27, 0.5) 11%, rgba(101, 101, 101, 0.2) 100%);
+  background: linear-gradient(
+    45deg,
+    rgba(247, 143, 27, 0.5) 11%,
+    rgba(101, 101, 101, 0.2) 100%
+  );
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
   filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#50f78f1b', endColorstr='#99656565', GradientType=1);
@@ -846,13 +978,25 @@ input[type=text] {
   clip-path: polygon(0 0%, 0% 100%, 100% 100%);
 
   /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#1f91d3+31,656565+100&0.5+31,0.6+100 */
-  background: -moz-linear-gradient(45deg, rgba(197, 191, 38, 0.8) 10%, rgba(247, 143, 27, 0.3) 50%);
+  background: -moz-linear-gradient(
+    45deg,
+    rgba(197, 191, 38, 0.8) 10%,
+    rgba(247, 143, 27, 0.3) 50%
+  );
 
   /* FF3.6-15 */
-  background: -webkit-linear-gradient(45deg, rgba(197, 191, 38, 0.8) 10%, rgba(247, 143, 27, 0.3) 50%);
+  background: -webkit-linear-gradient(
+    45deg,
+    rgba(197, 191, 38, 0.8) 10%,
+    rgba(247, 143, 27, 0.3) 50%
+  );
 
   /* Chrome10-25,Safari5.1-6 */
-  background: linear-gradient(45deg, rgba(197, 191, 38, 0.8) 10%, rgba(247, 143, 27, 0.3) 50%);
+  background: linear-gradient(
+    45deg,
+    rgba(197, 191, 38, 0.8) 10%,
+    rgba(247, 143, 27, 0.3) 50%
+  );
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
   filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#80c5bf26', endColorstr='#30f78f1b', GradientType=1);
@@ -871,13 +1015,25 @@ input[type=text] {
   clip-path: polygon(0 0, 45% 0, 100% 55%, 100% 100%);
 
   /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#1f91d3+31,656565+100&0.5+31,0.6+100 */
-  background: -moz-linear-gradient(-45deg, rgba(27, 208, 247, 0.5) 0%, rgba(255, 166, 50, 0.2) 100%);
+  background: -moz-linear-gradient(
+    -45deg,
+    rgba(27, 208, 247, 0.5) 0%,
+    rgba(255, 166, 50, 0.2) 100%
+  );
 
   /* FF3.6-15 */
-  background: -webkit-linear-gradient(-45deg, rgba(27, 208, 247, 0.5) 0%, rgba(255, 166, 50, 0.2) 100%);
+  background: -webkit-linear-gradient(
+    -45deg,
+    rgba(27, 208, 247, 0.5) 0%,
+    rgba(255, 166, 50, 0.2) 100%
+  );
 
   /* Chrome10-25,Safari5.1-6 */
-  background: linear-gradient(135deg, rgba(27, 208, 247, 0.5) 0%, rgba(255, 166, 50, 0.2) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(27, 208, 247, 0.5) 0%,
+    rgba(255, 166, 50, 0.2) 100%
+  );
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
   filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#501bd0f7', endColorstr='#99ffa632', GradientType=1);
@@ -896,13 +1052,25 @@ input[type=text] {
   clip-path: polygon(100% 2%, 0% 100%, 100% 100%);
 
   /* Permalink - use to edit and share this gradient: https://colorzilla.com/gradient-editor/#1f91d3+31,656565+100&0.5+31,0.6+100 */
-  background: -moz-linear-gradient(-45deg, rgba(255, 186, 0, 0.3) 10%, rgba(120, 38, 197, 0.8) 90%);
+  background: -moz-linear-gradient(
+    -45deg,
+    rgba(255, 186, 0, 0.3) 10%,
+    rgba(120, 38, 197, 0.8) 90%
+  );
 
   /* FF3.6-15 */
-  background: -webkit-linear-gradient(-45deg, rgba(255, 186, 0, 0.3) 10%, rgba(120, 38, 197, 0.8) 90%);
+  background: -webkit-linear-gradient(
+    -45deg,
+    rgba(255, 186, 0, 0.3) 10%,
+    rgba(120, 38, 197, 0.8) 90%
+  );
 
   /* Chrome10-25,Safari5.1-6 */
-  background: linear-gradient(135deg, rgba(255, 186, 0, 0.3) 10%, rgba(120, 38, 197, 0.8) 90%);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 186, 0, 0.3) 10%,
+    rgba(120, 38, 197, 0.8) 90%
+  );
 
   /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
   filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#30ffba00', endColorstr='#807826c5', GradientType=1);
@@ -913,27 +1081,30 @@ input[type=text] {
 /* Buttons
 --------------------------------------------- */
 
-.button, input[type=submit] {
+.button,
+input[type="submit"] {
   cursor: pointer;
-  font-family: 'Orbitron', sans-serif !important;
+  font-family: "Orbitron", sans-serif !important;
   font-weight: 400;
   font-size: 20px;
   letter-spacing: 5px;
   color: #212121;
-  background-color: #FFF;
-  border: 2px solid #FFF;
+  background-color: #fff;
+  border: 2px solid #fff;
   text-transform: uppercase;
   padding: 5px 20px;
   display: inline-block;
 }
 
-.button:hover, input[type=submit]:hover {
+.button:hover,
+input[type="submit"]:hover {
   transform: scale(0.95);
-  color: #FFF;
+  color: #fff;
   background-color: transparent;
 }
 
-.button.invert, input[type=submit].invert {
+.button.invert,
+input[type="submit"].invert {
   color: #e0e0e0;
   border-color: #e0e0e0;
   background-color: transparent;
@@ -943,62 +1114,68 @@ input[type=text] {
   text-transform: none;
 }
 
-.button.invert:hover, input[type=submit].invert:hover {
+.button.invert:hover,
+input[type="submit"].invert:hover {
   color: #212121;
-  background-color: #FFF;
+  background-color: #fff;
 }
 
-.transfer.active .button.cancel, .button.cancel {
+.transfer.active .button.cancel,
+.button.cancel {
   background-color: #e7384d;
   border-color: #e7384d;
-  color: #FFF;
+  color: #fff;
 }
 
-.transfer.active .button.cancel:hover, .button.cancel:hover {
+.transfer.active .button.cancel:hover,
+.button.cancel:hover {
   background-color: transparent;
   border-color: #e7384d;
   color: #e7384d;
 }
 
 .transfer {
-  .button.approve, input[type=submit].approve {
+  .button.approve,
+  input[type="submit"].approve {
     background-color: #0ed4a8;
     border-color: #0ed4a8;
     color: #212121;
   }
 }
 
-.button.approve, input[type=submit].approve {
+.button.approve,
+input[type="submit"].approve {
   background-color: #0ed4a8;
   border-color: #0ed4a8;
   color: #212121;
 }
 
 .transfer.active {
-  .button.approve:hover, input[type=submit].approve:hover {
-    border-color: #FFF;
-    background-color: #FFF;
+  .button.approve:hover,
+  input[type="submit"].approve:hover {
+    border-color: #fff;
+    background-color: #fff;
     color: #0ed4a8;
   }
 }
 
 .button.approve:hover {
-  border-color: #FFF;
-  background-color: #FFF;
+  border-color: #fff;
+  background-color: #fff;
   color: #0ed4a8;
 }
 
 input {
-  &[type=submit].approve:hover {
-    border-color: #FFF;
-    background-color: #FFF;
+  &[type="submit"].approve:hover {
+    border-color: #fff;
+    background-color: #fff;
     color: #0ed4a8;
   }
 
-  &[type=text] {
+  &[type="text"] {
     background-color: #212121;
     border: 2px solid #e0e0e0;
-    color: #FFF;
+    color: #fff;
     padding: 1vh 0.5vw;
   }
 }
@@ -1007,22 +1184,22 @@ input {
 --------------------------------------------- */
 
 form.amount.error {
-  input[type=text] {
+  input[type="text"] {
     color: #e7384d;
     border-color: #e7384d;
   }
 
   .button.approve {
-    opacity: .3;
-    border-color: #FFF;
-    color: #FFF;
+    opacity: 0.3;
+    border-color: #fff;
+    color: #fff;
     background-color: transparent;
     transform: scale(1);
 
     &:hover {
-      opacity: .3;
-      border-color: #FFF;
-      color: #FFF;
+      opacity: 0.3;
+      border-color: #fff;
+      color: #fff;
       background-color: transparent;
       transform: scale(1);
     }
@@ -1039,7 +1216,7 @@ form.amount.error {
   max-width: 200px;
 
   &.alienworlds {
-    background-image: url('images/alienworlds-logo.svg');
+    background-image: url("images/alienworlds-logo.svg");
   }
 }
 
@@ -1116,7 +1293,8 @@ form.amount.error {
     vertical-align: middle;
   }
 
-  .loginbtn, .logoutbtn {
+  .loginbtn,
+  .logoutbtn {
     padding: 0 0 0 35px;
     background-color: transparent;
     background-repeat: no-repeat;
@@ -1129,12 +1307,12 @@ form.amount.error {
 
   .loginbtn {
     color: #d9a555;
-    background-image: url('images/alienworlds-icon-login.svg');
+    background-image: url("images/alienworlds-icon-login.svg");
   }
 
   .logoutbtn {
     color: #ff3b52;
-    background-image: url('images/alienworlds-icon-logout.svg');
+    background-image: url("images/alienworlds-icon-logout.svg");
     margin-right: 1vw;
   }
 
@@ -1143,7 +1321,8 @@ form.amount.error {
     height: 30px;
     vertical-align: middle;
 
-    &.ethereum, &.binance {
+    &.ethereum,
+    &.binance {
       width: 40px;
       display: none;
     }
@@ -1154,7 +1333,8 @@ form.amount.error {
 }
 
 .profile .login {
-  .notlogged, .islogged {
+  .notlogged,
+  .islogged {
     display: none;
     opacity: 0;
   }
@@ -1166,13 +1346,16 @@ form.amount.error {
 }
 
 .profile .login .active {
-  &.notlogged, &.islogged {
+  &.notlogged,
+  &.islogged {
     display: inline-block;
     opacity: 1;
   }
 }
 
-.waxlog .profile .logo.wax, .ethereumlog .profile .logo.ethereum, .binancelog .profile .logo.binance {
+.waxlog .profile .logo.wax,
+.ethereumlog .profile .logo.ethereum,
+.binancelog .profile .logo.binance {
   display: inline-block;
   opacity: 1;
 }
@@ -1212,16 +1395,19 @@ form.amount.error {
   }
 }
 
-p.notice, p.error {
+p.notice,
+p.error {
   font-size: 14px;
   font-weight: 700;
 }
 
-.intro p.notice span, p.notice span {
+.intro p.notice span,
+p.notice span {
   text-decoration: underline;
 }
 
-.notlogged p.notice, p.error {
+.notlogged p.notice,
+p.error {
   color: #e7384d;
 }
 
@@ -1252,7 +1438,7 @@ p.notice, p.error {
   }
 
   p.notice {
-    color: #FFF !important;
+    color: #fff !important;
     margin-top: 2vh;
   }
 }
@@ -1270,20 +1456,23 @@ p.notice, p.error {
   }
 }
 
-.logo.wax, #starttransfer.wax .logo {
-  background-image: url('images/alienworlds-logo-wax.svg');
+.logo.wax,
+#starttransfer.wax .logo {
+  background-image: url("images/alienworlds-logo-wax.svg");
 }
 
 .wax .logo.wax {
   width: 80%;
 }
 
-.logo.ethereum, #starttransfer.ethereum .logo {
-  background-image: url('images/alienworlds-logo-ethereum.svg');
+.logo.ethereum,
+#starttransfer.ethereum .logo {
+  background-image: url("images/alienworlds-logo-ethereum.svg");
 }
 
-.logo.binance, #starttransfer.binance .logo {
-  background-image: url('images/alienworlds-logo-binance.svg');
+.logo.binance,
+#starttransfer.binance .logo {
+  background-image: url("images/alienworlds-logo-binance.svg");
 }
 
 .tfs {
@@ -1296,7 +1485,7 @@ p.notice, p.error {
   margin: 0 auto;
 
   &.two {
-    background-image: url('images/alienworlds-icon-transfer_2way.svg');
+    background-image: url("images/alienworlds-icon-transfer_2way.svg");
   }
 
   &.one {
@@ -1304,42 +1493,51 @@ p.notice, p.error {
   }
 }
 
-.leaving .tfs.one, .error .tfs.one, .leaving .tfs.one {
+.leaving .tfs.one,
+.error .tfs.one,
+.leaving .tfs.one {
   background-image: url("data:image/svg+xml,%3Csvg version='1.1' id='Layer_1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 208.8 129.6' style='enable-background:new 0 0 208.8 129.6;' xml:space='preserve'%3E%3Cstyle type='text/css'%3E .st0%7Bfill:%23e7384d;%7D%0A%3C/style%3E%3Cg%3E%3Cpath class='st0' d='M208.4,49L160.8,0.4c-0.5-0.6-1.4-0.6-2,0l-13.4,12.7c-0.3,0.3-0.4,0.6-0.4,1s0.1,0.7,0.4,1l22.9,23.7l-26,0 c-30.2,0-60.5,0-90.7,0c-2.9,0-6.7,0.1-10.5,0.6C24.8,41.7,11.1,51.5,4.3,65.6c-6.5,13.5-5.6,28.8,2.3,42.2c0,0,0,0,0,0.1 c13.8,20.5,38.1,21.7,39.2,21.7c0,0,0,0,0,0c17,0,30.4-6.3,39.9-18.6c10.1-13.1,12-27.6,5.8-42.9c-0.9-2.2-2-4.2-3.2-6.4 c-0.2-0.3-0.3-0.6-0.5-1h80.7l-23.4,23.5c-0.5,0.6-0.6,1.4,0,2l13.3,13.5c0.3,0.3,0.6,0.4,1,0.4s0.7-0.2,1-0.4l48-48.6 C208.9,50.4,208.9,49.6,208.4,49z M159.4,96.6l-11.3-11.4l24.9-24.9c0.4-0.4,0.5-1,0.3-1.5c-0.2-0.5-0.7-0.9-1.3-0.9H85.5 c-0.5,0-1,0.3-1.2,0.7s-0.3,0.9-0.1,1.4c0.5,1.1,1.1,2.1,1.6,3.1c1.1,2.1,2.2,4.1,3,6.1c5.8,14.4,4,27.9-5.4,40.1 c-8.9,11.6-21.6,17.5-37.6,17.5c0,0,0,0,0,0c-0.2,0-23.9-1.2-36.8-20.5C1.6,93.8,0.8,79.4,6.9,66.8c6.4-13.3,19.2-22.5,34.5-24.6 c3.6-0.5,7.3-0.6,10.1-0.6c30.2,0,60.5,0,90.7,0l28.4,0c0.6,0,1.1-0.3,1.3-0.9l0.3-0.7c0.2-0.5,0.1-1.1-0.3-1.6l-23.5-24.4 l11.4-10.7L205.4,50L159.4,96.6z'/%3E%3Cpath class='st0' d='M50.1,57.7c-8.3-0.7-16.6,2-22.8,7.6c-9.6,8.6-11.4,22.8-4.1,33.1c5.3,7.4,13.1,11.6,23.2,12.3 c0.6,0.1,1.3,0.1,1.9,0.1c5,0,10.5-1.6,15.2-4.5c6.5-4,11-10.6,12.3-17.9c1.2-7-0.4-13.8-4.7-19.3C65.9,62.5,58.5,58.5,50.1,57.7z M73,87.8c-1.2,6.5-5.2,12.4-11,16c-4.8,3-10.4,4.4-15.4,4c0,0,0,0,0,0c-9.3-0.7-16.2-4.4-21.1-11.1c-6.5-9-4.9-21.7,3.7-29.3 c5.1-4.5,11.4-7,18.2-7c0.8,0,1.7,0,2.5,0.1c7.6,0.7,14.3,4.3,18.9,10.3C72.6,75.6,74.1,81.7,73,87.8z'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 .transaction {
-  &.fromwax.pending .direction:nth-of-type(5) .tfs.one, &.towax.pending .direction:nth-of-type(3) .tfs.one {
+  &.fromwax.pending .direction:nth-of-type(5) .tfs.one,
+  &.towax.pending .direction:nth-of-type(3) .tfs.one {
     background-image: url("data:image/svg+xml,%3Csvg version='1.1' id='Layer_1' xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' x='0px' y='0px' viewBox='0 0 208.8 129.6' style='enable-background:new 0 0 208.8 129.6;' xml:space='preserve'%3E%3Cstyle type='text/css'%3E .st0%7Bfill:%23e7384d;%7D%0A%3C/style%3E%3Cg%3E%3Cpath class='st0' d='M208.4,49L160.8,0.4c-0.5-0.6-1.4-0.6-2,0l-13.4,12.7c-0.3,0.3-0.4,0.6-0.4,1s0.1,0.7,0.4,1l22.9,23.7l-26,0 c-30.2,0-60.5,0-90.7,0c-2.9,0-6.7,0.1-10.5,0.6C24.8,41.7,11.1,51.5,4.3,65.6c-6.5,13.5-5.6,28.8,2.3,42.2c0,0,0,0,0,0.1 c13.8,20.5,38.1,21.7,39.2,21.7c0,0,0,0,0,0c17,0,30.4-6.3,39.9-18.6c10.1-13.1,12-27.6,5.8-42.9c-0.9-2.2-2-4.2-3.2-6.4 c-0.2-0.3-0.3-0.6-0.5-1h80.7l-23.4,23.5c-0.5,0.6-0.6,1.4,0,2l13.3,13.5c0.3,0.3,0.6,0.4,1,0.4s0.7-0.2,1-0.4l48-48.6 C208.9,50.4,208.9,49.6,208.4,49z M159.4,96.6l-11.3-11.4l24.9-24.9c0.4-0.4,0.5-1,0.3-1.5c-0.2-0.5-0.7-0.9-1.3-0.9H85.5 c-0.5,0-1,0.3-1.2,0.7s-0.3,0.9-0.1,1.4c0.5,1.1,1.1,2.1,1.6,3.1c1.1,2.1,2.2,4.1,3,6.1c5.8,14.4,4,27.9-5.4,40.1 c-8.9,11.6-21.6,17.5-37.6,17.5c0,0,0,0,0,0c-0.2,0-23.9-1.2-36.8-20.5C1.6,93.8,0.8,79.4,6.9,66.8c6.4-13.3,19.2-22.5,34.5-24.6 c3.6-0.5,7.3-0.6,10.1-0.6c30.2,0,60.5,0,90.7,0l28.4,0c0.6,0,1.1-0.3,1.3-0.9l0.3-0.7c0.2-0.5,0.1-1.1-0.3-1.6l-23.5-24.4 l11.4-10.7L205.4,50L159.4,96.6z'/%3E%3Cpath class='st0' d='M50.1,57.7c-8.3-0.7-16.6,2-22.8,7.6c-9.6,8.6-11.4,22.8-4.1,33.1c5.3,7.4,13.1,11.6,23.2,12.3 c0.6,0.1,1.3,0.1,1.9,0.1c5,0,10.5-1.6,15.2-4.5c6.5-4,11-10.6,12.3-17.9c1.2-7-0.4-13.8-4.7-19.3C65.9,62.5,58.5,58.5,50.1,57.7z M73,87.8c-1.2,6.5-5.2,12.4-11,16c-4.8,3-10.4,4.4-15.4,4c0,0,0,0,0,0c-9.3-0.7-16.2-4.4-21.1-11.1c-6.5-9-4.9-21.7,3.7-29.3 c5.1-4.5,11.4-7,18.2-7c0.8,0,1.7,0,2.5,0.1c7.6,0.7,14.3,4.3,18.9,10.3C72.6,75.6,74.1,81.7,73,87.8z'/%3E%3C/g%3E%3C/svg%3E");
   }
 }
 
-.enter, .accessed {
+.enter,
+.accessed {
   display: none;
   opacity: 0;
 }
 
-.enter.active, .accessed.active, .islogged .accessed {
+.enter.active,
+.accessed.active,
+.islogged .accessed {
   display: block;
   opacity: 1;
 }
 
-.accessed p, .transfer p {
+.accessed p,
+.transfer p {
   color: #d9a555;
   font-weight: 600;
   font-size: 16px;
   margin-bottom: 1vw;
 }
 
-.accessed .balance, .transfer .balance {
-  font-family: 'Orbitron';
+.accessed .balance,
+.transfer .balance {
+  font-family: "Orbitron";
   font-weight: 700;
   font-size: 28px;
   line-height: 36px;
   margin-bottom: 2vw;
 }
 
-.ethereumlog .eth-bsc .logo.binance, .binancelog .eth-bsc .logo.ethereum {
+.ethereumlog .eth-bsc .logo.binance,
+.binancelog .eth-bsc .logo.ethereum {
   display: none;
 }
 
@@ -1349,7 +1547,7 @@ p.notice, p.error {
   .button {
     cursor: default;
     background-color: transparent;
-    color: #FFF;
+    color: #fff;
 
     &:hover {
       transform: scale(1);
@@ -1388,19 +1586,27 @@ p.notice, p.error {
 
 /* BG Animations */
 
-.waxlog .objects .grid, .ethereumlog .objects .grid, .binancelog .objects .grid {
+.waxlog .objects .grid,
+.ethereumlog .objects .grid,
+.binancelog .objects .grid {
   transform: translate(-51%, -52%) scale(1.2);
 }
 
-.waxlog .objects .dots, .ethereumlog .objects .dots, .binancelog .objects .dots {
+.waxlog .objects .dots,
+.ethereumlog .objects .dots,
+.binancelog .objects .dots {
   transform: translate(-51%, -49%) scale(1.3);
 }
 
-.waxlog .objects .lines, .ethereumlog .objects .lines, .binancelog .objects .lines {
+.waxlog .objects .lines,
+.ethereumlog .objects .lines,
+.binancelog .objects .lines {
   transform: translate(-45%, -55%) scale(1.5);
 }
 
-.waxlog .sky, .ethereumlog .sky, .binancelog .sky {
+.waxlog .sky,
+.ethereumlog .sky,
+.binancelog .sky {
   transform: translate(0%, 0%) scale(1.1);
 }
 
@@ -1436,12 +1642,14 @@ p.notice, p.error {
   }
 }
 
-.ethereumlog .gradother1, .binancelog .gradother1 {
+.ethereumlog .gradother1,
+.binancelog .gradother1 {
   transform: translate(25vw, 0vw);
   opacity: 0.5;
 }
 
-.ethereumlog .gradother2, .binancelog .gradother2 {
+.ethereumlog .gradother2,
+.binancelog .gradother2 {
   transform: translate(0vw, 0vw);
   opacity: 0.3;
 }
@@ -1497,7 +1705,7 @@ p.notice, p.error {
 
   .amount {
     flex: 2;
-    font-family: 'Orbitron';
+    font-family: "Orbitron";
     font-size: 24px;
   }
 
@@ -1547,7 +1755,7 @@ p.notice, p.error {
   }
 
   &.pending > div {
-    opacity: .5;
+    opacity: 0.5;
   }
 
   &:after {
@@ -1563,7 +1771,7 @@ p.notice, p.error {
 
   &.pending {
     &:after {
-      content: 'pending...';
+      content: "pending...";
     }
 
     .action {
@@ -1579,7 +1787,7 @@ p.notice, p.error {
     color: #e7384d;
 
     &:after {
-      content: 'Error Message Reason';
+      content: "Error Message Reason";
     }
   }
 }
@@ -1588,7 +1796,9 @@ p.notice, p.error {
 
 .islogged.isdashboard {
   .objects {
-    .grid, .dots, .lines {
+    .grid,
+    .dots,
+    .lines {
       transform: translate(-50%, -50%) scale(1);
     }
   }
@@ -1610,12 +1820,14 @@ p.notice, p.error {
   }
 }
 
-.ethereumlog.isdashboard .gradother1, .binancelog.isdashboard .gradother1 {
+.ethereumlog.isdashboard .gradother1,
+.binancelog.isdashboard .gradother1 {
   transform: translate(50vw, 0vw);
   opacity: 0.5;
 }
 
-.ethereumlog.isdashboard .gradother2, .binancelog.isdashboard .gradother2 {
+.ethereumlog.isdashboard .gradother2,
+.binancelog.isdashboard .gradother2 {
   transform: translate(30vw, 0vw);
   opacity: 0.3;
 }
@@ -1709,19 +1921,21 @@ p.notice, p.error {
     }
 
     .direction {
-      flex: .5;
+      flex: 0.5;
     }
 
-    &.fromwax .direction:nth-of-type(5) .tfs.one, &.towax .direction:nth-of-type(3) .tfs.one {
+    &.fromwax .direction:nth-of-type(5) .tfs.one,
+    &.towax .direction:nth-of-type(3) .tfs.one {
       background-position: right center;
     }
 
-    &.fromwax .direction:nth-of-type(3) .tfs.one, &.towax .direction:nth-of-type(5) .tfs.one {
+    &.fromwax .direction:nth-of-type(3) .tfs.one,
+    &.towax .direction:nth-of-type(5) .tfs.one {
       background-position: left center;
     }
 
     .action {
-      flex: .5;
+      flex: 0.5;
     }
 
     .button {
@@ -1729,7 +1943,8 @@ p.notice, p.error {
       padding: 15px 20px;
     }
 
-    &.pending .amount, &.error .amount {
+    &.pending .amount,
+    &.error .amount {
       padding-bottom: 10px;
     }
 
@@ -1882,29 +2097,33 @@ p.notice, p.error {
   width: 100%;
   left: 0;
   bottom: 0;
-  padding: 1%;
+  padding: 10px;
   background-color: #ff3b52;
-  color: #FFF;
+  color: #fff;
   text-align: center;
-  transform: translateY(200px);
-  animation: barin 2s forwards ease-out;
+  animation: barin 2s forwards ease-out, barout 2s forwards ease-in 18s;
   z-index: 99999;
-  font-weight: 500;
 }
-
 .announcebar a {
-  color: #FFF;
-  font-family: 'Titillium Web', sans-serif;
+  color: #fff;
 }
-
 .announcebar a:hover {
-  opacity: .6;
+  opacity: 0.6;
 }
 
 @keyframes barin {
   0% {
+    transform: translateY(200px);
   }
   100% {
     transform: translateY(0px);
+  }
+}
+@keyframes barout {
+  0% {
+  }
+  100% {
+    transform: translateY(200px);
+    display: none;
   }
 }

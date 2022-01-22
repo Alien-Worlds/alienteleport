@@ -14,7 +14,7 @@
     "eosjs": "^21.0.3",
     "ethereumjs-util": "^7.0.4",
     "ethers": "^5.3.1",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^3.1.1",
     "text-encoding": "^0.7.0",
     "web3": "^1.2.11"
   }

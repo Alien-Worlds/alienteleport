@@ -8,12 +8,13 @@ When an event is received, it will call the `received` action on the EOS chain
 
 process.title = `oracle-eth ${process.env['CONFIG']}`;
 
-const { Api, JsonRpc } = require('eosjs');
-const { TextDecoder, TextEncoder } = require('text-encoding');
-const { JsSignatureProvider } = require('eosjs/dist/eosjs-jssig');
-const fetch = require('node-fetch');
-const fs = require('fs');
-const ethers = require('ethers');
+import { Api, JsonRpc } from 'eosjs';
+import { TextDecoder, TextEncoder } from 'text-encoding';
+import { JsSignatureProvider } from 'eosjs/dist/eosjs-jssig';
+import fetch from 'node-fetch';
+import fs from 'fs';
+import ethers from 'ethers';
+import { EosioAction } from 'eosio-helpers/dist/CommonTypes';
 
 const config = require(process.env['CONFIG'] || './config');
 
@@ -39,13 +40,13 @@ const teleport_topic =
   '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
 const precision = 4;
 
-const sleep = async (ms) => {
+const sleep = async (ms: number) => {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 };
 
-const await_confirmation = async (txid) => {
+const await_confirmation = async (txid: string) => {
   return new Promise(async (resolve) => {
     let resolved = false;
     while (!resolved) {
@@ -62,9 +63,9 @@ const await_confirmation = async (txid) => {
 };
 
 const load_block = async () => {
-  let block_number = 'latest';
+  let block_number: string | number = 'latest';
   if (fs.existsSync(blocks_file)) {
-    const file_contents = await fs.readFileSync(blocks_file);
+    const file_contents = await fs.readFileSync(blocks_file).toString();
     if (file_contents) {
       block_number = parseInt(file_contents);
       if (isNaN(block_number)) {
@@ -78,12 +79,12 @@ const load_block = async () => {
 
   return block_number;
 };
-const save_block = async (block_num) => {
+const save_block = async (block_num: number) => {
   await fs.writeFileSync(blocks_file, block_num.toString());
 };
 
-const process_claimed = async (from_block, to_block) => {
-  return new Promise(async (resolve, reject) => {
+const process_claimed = async (from_block: number, to_block: number) => {
+  return new Promise<void>(async (resolve, reject) => {
     try {
       const query = {
         fromBlock: from_block,
@@ -108,7 +109,7 @@ const process_claimed = async (from_block, to_block) => {
             (data[2].toNumber() / Math.pow(10, precision)).toFixed(precision) +
             ' ' +
             config.symbol;
-          const actions = [];
+          const actions: EosioAction[] = [];
           actions.push({
             account: config.eos.teleportContract,
             name: 'claimed',
@@ -171,8 +172,8 @@ const process_claimed = async (from_block, to_block) => {
   });
 };
 
-const process_teleported = async (from_block, to_block) => {
-  return new Promise(async (resolve, reject) => {
+const process_teleported = async (from_block: number, to_block: number) => {
+  return new Promise<void>(async (resolve, reject) => {
     try {
       const query = {
         fromBlock: from_block,
@@ -206,7 +207,7 @@ const process_teleported = async (from_block, to_block) => {
           const quantity = `${amount} ${config.symbol}`;
           const txid = res[r].transactionHash.replace(/^0x/, '');
 
-          const actions = [];
+          const actions: EosioAction[] = [];
           actions.push({
             account: config.eos.teleportContract,
             name: 'received',
@@ -261,7 +262,7 @@ const process_teleported = async (from_block, to_block) => {
   });
 };
 
-const run = async (from_block = 'latest') => {
+const run = async (from_block: string | number = 'latest') => {
   while (true) {
     try {
       const block = await provider.getBlock('latest');

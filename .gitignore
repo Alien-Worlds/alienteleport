@@ -4,3 +4,4 @@ contracts/teleporteos/node_modules
 teleporteos.ts
 eosio.token.ts
 contracts/teleporteos/artifacts
+node_modules

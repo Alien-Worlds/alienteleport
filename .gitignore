@@ -1,0 +1,6 @@
+oracle/node_modules
+config.js
+contracts/teleporteos/node_modules
+teleporteos.ts
+eosio.token.ts
+contracts/teleporteos/artifacts

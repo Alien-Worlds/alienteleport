@@ -1,0 +1,30 @@
+{
+  "name": "teleporteos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "lamington test -DIS_DEV",
+    "build": "lamington build",
+    "stop": "lamington stop"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/chai": "latest",
+    "@types/mocha": "latest",
+    "chai": "latest"
+  },
+  "dependencies": {
+    "eosjs": "^20.0.0",
+    "@types/chai-as-promised": "^7.1.2",
+    "@types/chai-datetime": "^0.0.37",
+    "chai-as-promised": "^7.1.1",
+    "lamington": "https://github.com/Alien-Worlds/lamington.git",
+    "typescript": "^4.4.3",
+    "call-bind": "^1.0.2",
+    "chai-datetime": "^1.8.0",
+    "node-fetch": "^2.0.0"
+  }
+}

@@ -12,7 +12,7 @@
     "@eosdacio/eosio-statereceiver": "^1.0.2",
     "abi-decoder": "^2.4.0",
     "eosjs": "^22.0.0",
-    "eosio-helpers": "^0.1.4",
+    "eosio-helpers": "^0.1.6",
     "ethereumjs-util": "^7.0.4",
     "ethers": "^5.3.1",
     "node-fetch": "2.0",

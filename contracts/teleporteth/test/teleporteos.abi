@@ -1,0 +1,397 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.1",
+    "types": [],
+    "structs": [
+        {
+            "name": "cancel",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "cancel_item",
+            "base": "",
+            "fields": [
+                {
+                    "name": "teleport_id",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "claimed",
+            "base": "",
+            "fields": [
+                {
+                    "name": "oracle_name",
+                    "type": "name"
+                },
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "to_eth",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                }
+            ]
+        },
+        {
+            "name": "delreceipts",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "delteles",
+            "base": "",
+            "fields": []
+        },
+        {
+            "name": "deposit_item",
+            "base": "",
+            "fields": [
+                {
+                    "name": "account",
+                    "type": "name"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                }
+            ]
+        },
+        {
+            "name": "logteleport",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "timestamp",
+                    "type": "uint32"
+                },
+                {
+                    "name": "from",
+                    "type": "name"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                },
+                {
+                    "name": "chain_id",
+                    "type": "uint8"
+                },
+                {
+                    "name": "eth_address",
+                    "type": "checksum256"
+                }
+            ]
+        },
+        {
+            "name": "oracle_item",
+            "base": "",
+            "fields": [
+                {
+                    "name": "account",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "receipt_item",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "date",
+                    "type": "time_point_sec"
+                },
+                {
+                    "name": "ref",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "to",
+                    "type": "name"
+                },
+                {
+                    "name": "chain_id",
+                    "type": "uint8"
+                },
+                {
+                    "name": "confirmations",
+                    "type": "uint8"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                },
+                {
+                    "name": "approvers",
+                    "type": "name[]"
+                },
+                {
+                    "name": "completed",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "received",
+            "base": "",
+            "fields": [
+                {
+                    "name": "oracle_name",
+                    "type": "name"
+                },
+                {
+                    "name": "to",
+                    "type": "name"
+                },
+                {
+                    "name": "ref",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                },
+                {
+                    "name": "chain_id",
+                    "type": "uint8"
+                },
+                {
+                    "name": "confirmed",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "regoracle",
+            "base": "",
+            "fields": [
+                {
+                    "name": "oracle_name",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "sign",
+            "base": "",
+            "fields": [
+                {
+                    "name": "oracle_name",
+                    "type": "name"
+                },
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "signature",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "teleport",
+            "base": "",
+            "fields": [
+                {
+                    "name": "from",
+                    "type": "name"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                },
+                {
+                    "name": "chain_id",
+                    "type": "uint8"
+                },
+                {
+                    "name": "eth_address",
+                    "type": "checksum256"
+                }
+            ]
+        },
+        {
+            "name": "teleport_item",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "time",
+                    "type": "uint32"
+                },
+                {
+                    "name": "account",
+                    "type": "name"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                },
+                {
+                    "name": "chain_id",
+                    "type": "int8"
+                },
+                {
+                    "name": "eth_address",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "oracles",
+                    "type": "name[]"
+                },
+                {
+                    "name": "signatures",
+                    "type": "string[]"
+                },
+                {
+                    "name": "claimed",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "unregoracle",
+            "base": "",
+            "fields": [
+                {
+                    "name": "oracle_name",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "withdraw",
+            "base": "",
+            "fields": [
+                {
+                    "name": "from",
+                    "type": "name"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                }
+            ]
+        }
+    ],
+    "actions": [
+        {
+            "name": "cancel",
+            "type": "cancel",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "claimed",
+            "type": "claimed",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "delreceipts",
+            "type": "delreceipts",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "delteles",
+            "type": "delteles",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "logteleport",
+            "type": "logteleport",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "received",
+            "type": "received",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "regoracle",
+            "type": "regoracle",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "sign",
+            "type": "sign",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "teleport",
+            "type": "teleport",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "unregoracle",
+            "type": "unregoracle",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "withdraw",
+            "type": "withdraw",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [
+        {
+            "name": "cancels",
+            "type": "cancel_item",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "deposits",
+            "type": "deposit_item",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "oracles",
+            "type": "oracle_item",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "receipts",
+            "type": "receipt_item",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "teleports",
+            "type": "teleport_item",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        }
+    ],
+    "ricardian_clauses": [],
+    "variants": []
+}

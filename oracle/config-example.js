@@ -1,20 +1,24 @@
 module.exports = {
     precision: 4,
     symbol: 'TLM',
-    network: 'BSC',
+    confirmations: 2,
     eos: {
-        wsEndpoint: 'ws://178.63.44.179:8082',
-        chainId: "f16b1833c747c43682f4386fca9cbb327929334a762755ebec17f6f23c9b8a12",
-        endpoint: 'https://testnet.waxsweden.org',
-        teleportContract: 'other.worlds',
-        oracleAccount: '',
-        privateKey: '5C234dc...'
+        network: 'EOS',
+        chainId: "cf057bbfb72640471fd910bcb67639c22df9f92470936cddc1ade0e2f2e7dc4f",
+        endpoints: [
+            'https://jungle.eosphere.io:443', 'http://jungle2.cryptolions.io:80', 'http://jungle2.cryptolions.io:8888', 
+        ],
+        epVerifications: 2,
+        teleportContract: 'eosiotestacc',
+        oracleAccount: 'anneliese',
+        privateKey: '5K29JmEvWEnfdD5DV1bm9Ro4qMrTKhBGmTXuaaqmrZSMEntqqZQ'
+        
     },
     eth: {
-        wsEndpoint: 'wss://kovan.infura.io/ws/v3/9ae811d1c04243f2869a05848207b985',
-        endpoint: 'https://ropsten.infura.io/v3/9ae811d1c04243f2869a05848207b985',
+        network: 'BSC',
+        endpoint: 'http://localhost:8545/',
         teleportContract: '0x0789a30aa30d6a7a7536a7ed26956bbdb0fc80bd',
         oracleAccount: '0x111111111111111111111111111111111111111',
-        privateKey: 'ABC434DCF...'
+        privateKey: '2a6bdd74caefd68f16f7ee06ad37c922502c9b081f2fa26a69a1c57cd0c118a2'
     }
 }

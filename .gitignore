@@ -1,8 +1,6 @@
-oracle/node_modules
 config.js
-contracts/teleporteos/node_modules
-contracts/teleporteth/node_modules
 teleporteos.ts
 eosio.token.ts
 contracts/teleporteos/artifacts
 build
+node_modules

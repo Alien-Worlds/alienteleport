@@ -14,7 +14,7 @@ import { SingleRun, Sleep } from 'eosio-helpers';
 import yargs from 'yargs';
 import { ConfigType } from './CommonTypes';
 
-const config: ConfigType = require(process.env['CONFIG'] || './config');
+const config: ConfigType = require(process.env['CONFIG'] || '../config');
 
 const provider = new ethers.providers.StaticJsonRpcProvider(
   config.eth.endpoint
@@ -310,7 +310,7 @@ const run = async (start_ref: 'latest' | number, submit_to_blockchain: boolean) 
       if(from_block < 0){
         from_block = 0
       }
-      
+
       let to_block = Math.min(from_block + 100, latest_block);
 
       if (start_ref >= latest_block) {

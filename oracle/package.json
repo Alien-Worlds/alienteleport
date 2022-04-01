@@ -3,8 +3,8 @@
   "version": "1.1.0",
   "description": "",
   "scripts": {
-    "eth": "tsc && node dist/oracle-eth.js",
-    "eos": "tsc && node dist/oracle-eos.js",
+    "eth": "tsc && node oracle-eth.js",
+    "eos": "tsc && node oracle-eos.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -24,6 +24,7 @@
     "yargs": "^17.4.0"
   },
   "devDependencies": {
+    "@types/elliptic": "^6.4.14",
     "@types/ethereumjs-util": "^6.1.0",
     "@types/text-encoding": "0.0.36"
   }

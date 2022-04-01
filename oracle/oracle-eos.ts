@@ -56,10 +56,29 @@ const sleep = async (ms: number) => {
 class EosOracle{
     private eos_api: EosApi
     public running = false
+    private irreversible_time = 0
+    // private current_block_time = 0
+    static maxWait = 180
+
     constructor(private config: ConfigType, private signatureProvider: JsSignatureProvider){
         this.eos_api = new EosApi(config.eos.chainId, config.eos.endpoints, signatureProvider)
     }
     
+    // static async tryHard(tries: number, action : (tryNumber?: number) => Promise<boolean | any>, onCatch: (e?: any, tryNumber?: number) => boolean | undefined) {
+    //     let tryI = 0
+    //     let fin : any = false
+    //     do{
+    //         try{
+    //             fin = await action(tryI)
+    //             if(fin || typeof fin == 'number'){
+    //                 return fin
+    //             }
+    //         } catch (e){
+    //             fin = onCatch(e, tryI)? true : false
+    //         }
+    //     } while (!fin && tryI < tries)
+    // }
+
     /**
      * Send sign a teleport. Repeats itself until a defined amount of tries are reached 
      * @param id Teleport id
@@ -221,49 +240,125 @@ class EosOracle{
         const chain_data = await this.getTableRows(request.lowerId, request.amount, true) as GetTableRowsResult
         let lowest_amount = chain_data.rows.length
         
-        // Get the the teleports in raw format from other endpoints for verification
+        // Get the teleports in raw format from other endpoints for verification
         let verify_data : Array<Array<string>> = []
-        const initialEndpoint = this.eos_api.getEndpoint()
-        for(let i = 1; i < this.config.eos.epVerifications; i++){
-            await this.eos_api.nextEndpoint()
-            const vData = (await this.getTableRows(request.lowerId, request.amount, false) as GetTableRowsResult).rows as Array<string>
-            verify_data.push(vData)
-            if(initialEndpoint == this.eos_api.getEndpoint()){
-                console.error('No available endpoints for verification. ⛔')
-                process.exit(1)
-            }
-            // Handle only to the lowest amount of entries  
-            if(lowest_amount > vData.length){
-                lowest_amount = vData.length 
+        if(lowest_amount > 0){
+            const initialEndpoint = this.eos_api.getEndpoint()
+            for(let i = 1; i < this.config.eos.epVerifications; i++){
+                await this.eos_api.nextEndpoint()
+                const vData = (await this.getTableRows(request.lowerId, request.amount, false) as GetTableRowsResult).rows as Array<string>
+                verify_data.push(vData)
+                if(initialEndpoint == this.eos_api.getEndpoint()){
+                    console.error('No available endpoints for verification. ⛔')
+                    process.exit(1)
+                }
+                // Handle only to the lowest amount of entries  
+                if(lowest_amount > vData.length){
+                    lowest_amount = vData.length 
+                }
             }
         }
         return {chain_data, verify_data, lowest_amount}
     }
     
     /**
+     * Update the current block time and the last irreversible block time
+     */
+    async updateTimes(){
+        
+        let minIrrTime = this.irreversible_time
+        // let minCurrentTimeMs = this.current_block_time
+        let lowestIrr: number | undefined = undefined
+        let epStart = this.eos_api.getEndpoint()
+        let verifications = 0
+        do{
+            try{
+                // Get current info
+                let info = await this.eos_api.getRPC().get_info()
+                let irr_time : number
+                
+                if(info.last_irreversible_block_time){
+                    // Get last irreversible block time if available
+                    irr_time = new Date(info.last_irreversible_block_time + 'Z').getTime()
+                    
+                    // // Check current time
+                    // let cur_time = new Date(info.head_block_time).getTime()
+                    // if(cur_time <= minIrrTime){
+                    //     throw(`Current time is lower than possible, occurred by using ${this.eos_api.getEndpoint()}`)
+                    // }
+                    // if(cur_time < minCurrentTimeMs){
+                    //     minCurrentTimeMs = cur_time
+                    // }
+                } else if (info.last_irreversible_block_num){
+                    // Get last irreversible block time from last irreversible block
+                    let irr_block = await this.eos_api.getRPC().get_block(info.last_irreversible_block_num)
+                    irr_time = new Date(irr_block.timestamp + 'Z').getTime()                    
+                } else {
+                    throw('No time parameter given by ' + this.eos_api.getEndpoint())
+                }
+
+                if(typeof irr_time == 'number'){
+                    // Convert to full seconds
+                    let t = Math.floor(irr_time / 1000)
+                    if(t < minIrrTime){
+                        throw(`Irreversible time is lower than possible, occurred by using ${this.eos_api.getEndpoint()}`)
+                    } else if(lowestIrr === undefined || t < lowestIrr) {
+                        // New lowest possible irreversible time
+                        lowestIrr = t
+                    }
+                } else {
+                    throw(`Time parameter is not a number, occurred by using ${this.eos_api.getEndpoint()}`)
+                }
+                verifications++
+            } catch(e) {
+                console.log('⚡️ ' + e);
+                // Get next endpoint and check if all endpoints are already checked
+                this.eos_api.nextEndpoint()
+                if(epStart == this.eos_api.getEndpoint()){
+                    throw('Could not get last irreversible block time from any endpoint. ⛔')
+                }
+            }
+        } while(verifications < this.config.eos.epVerifications)
+
+        // Set new time values
+        if(lowestIrr){
+            this.irreversible_time = lowestIrr
+        }
+        // this.current_block_time = minCurrentTimeMs
+    }
+
+    /**
      * Sign all teleports 
      * @param signProcessData.lowerId Id of teleport to start from. Will be updated by the handled amount of teleports.
      * @param signProcessData.amount Amount of requested teleports
      */
     async signAllTeleportsUntilNow(signProcessData: {lowerId: number, amount: number}){
+        
+        let waitForIrr = 0
+        let lastHandledId = signProcessData.lowerId
+
         // Get next teleports
         let {chain_data, verify_data, lowest_amount} = await this.getNextTeleports(signProcessData)
         
-        for(let rowIndex = 0; rowIndex < lowest_amount; rowIndex++){
+        for(let rowIndex = 0; rowIndex < lowest_amount; rowIndex++) {
             const item = chain_data.rows[rowIndex] as TeleportTableEntry
+            
             // Check if already claimed anf if the required amount of signes is already reached
             if(item.claimed){
                 console.log(`Teleport id ${item.id}, is already claimed. ✔️`)
+                lastHandledId = item.id + 1
                 continue
             }
             // Check if the required amount of signes is already reached
             if(item.oracles.length >= this.config.confirmations){
                 console.log(`Teleport id ${item.id}, has already sufficient confirmations. ✔️`)
+                lastHandledId = item.id + 1
                 continue
             }
             // Check if this oracle account has already signed
             if(item.oracles.find(oracle => oracle == this.config.eos.oracleAccount) != undefined){
                 console.log(`Teleport id ${item.id}, has already signed. ✔️`)
+                lastHandledId = item.id + 1
                 continue
             }
             
@@ -280,7 +375,14 @@ class EosOracle{
                 }
                 // console.log(`Teleport id ${item.id}, verified ${i + 1} times`);
             }
-            
+
+            // Check time
+            if(item.time > this.irreversible_time){
+                waitForIrr = item.time - this.irreversible_time
+                lastHandledId = item.id
+                break;
+            }
+
             if(!isVerifyed){
                 console.error(`Teleport id ${item.id}, skip this one. ❌`)
             } else {
@@ -290,30 +392,42 @@ class EosOracle{
                 // Send signature to eosio chain
                 await this.sendSignAction(item.id, signature)
             }
+            lastHandledId = item.id + 1
         }
         
-        // Set last handled teleport id and get next teleports
-        signProcessData.lowerId += lowest_amount
-        if(chain_data.more == true && this.running){
-            await this.signAllTeleportsUntilNow(signProcessData)
+        // Set next teleport id and get the next teleports
+        signProcessData.lowerId = lastHandledId
+        if(this.running){
+            if(waitForIrr > 0){
+                // Wait maximal 180 seconds
+                if(waitForIrr > EosOracle.maxWait) {
+                    waitForIrr = EosOracle.maxWait
+                }
+                console.log(`Wait ${waitForIrr} seconds until teleport id ${signProcessData.lowerId} is irreversible.`)
+                await EosOracle.WaitWithAnimation(waitForIrr)
+                await this.signAllTeleportsUntilNow(signProcessData)
+            }
+            else if(chain_data.more == true){
+                await this.updateTimes()
+                await this.signAllTeleportsUntilNow(signProcessData)
+            }
         }
     }
     
     /**
-     * Wait 5 seconds
+     * Wait for a defined amount of time and show remaining seconds
+     * @param s Seconds to wait
      */
-    static async WaitAnimation(){
-        process.stdout.write('All available teleports signed\x1b[?25l')
-        await sleep(1000)
-        process.stdout.write(' 💤')
-        await sleep(1000)
-        process.stdout.write(' 💤')
-        await sleep(1000)
-        process.stdout.write(' 💤')
-        await sleep(1000)
-        process.stdout.write(' ↩️')
-        await sleep(1000)
-        process.stdout.write("\r\x1b[K")
+    static async WaitWithAnimation(s: number, info: string = ""){
+        process.stdout.write(info + "\n\x1b[?25l")
+        for(let i = 0; i < s; i++){
+            process.stdout.write(`💤 ${i} s / ${s} s 💤`)
+            await sleep(1000)
+            process.stdout.write("\r\x1b[K")
+        }
+        
+        process.stdout.moveCursor(0, -1) // up one line
+        process.stdout.clearLine(1) // from cursor to end
     }
 
     /**
@@ -330,8 +444,9 @@ class EosOracle{
             const signProcessData = {lowerId: id, amount: requestAmount}
             while(this.running){
                 await this.eos_api.nextEndpoint()
+                await this.updateTimes()
                 await this.signAllTeleportsUntilNow(signProcessData)
-                await EosOracle.WaitAnimation()
+                await EosOracle.WaitWithAnimation(EosOracle.maxWait, 'All available teleports signed')
             }
         } catch (e){
             console.error('⚡️ ' + e);

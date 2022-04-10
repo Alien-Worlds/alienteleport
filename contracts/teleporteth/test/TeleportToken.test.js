@@ -47,16 +47,16 @@ const TestSettings = {
     keys: generateAllKeys('8940fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378100'),
   }, {
     eosio_name: 'anneliese',
-    keys: generateAllKeys('8940fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378101'),
+    keys: generateAllKeys('fef658def915544a10ca323e6b4f33a6179043e1862a522c20837fb87869e668'),
   }, {
     eosio_name: 'peterpeter12',
-    keys: generateAllKeys('8940fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378102'),
+    keys: generateAllKeys('579d5ba8a4423300b0c820930fdcc277bc805a29b94d026f35dec4b2e333820e'),
   }, {
     eosio_name: 'helga',
     keys: generateAllKeys('4040fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378110'),
   },{
     eosio_name: 'hans',
-    keys: generateAllKeys('8940fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378103'),
+    keys: generateAllKeys('7695855d7b7590c52a0af76ded6866724dea37f07e33e4545c9ea17a2740e529'),
   }],
   eosioAbi: JSON.parse(fs.readFileSync('./test/teleporteos.abi', null).toString())
 }
@@ -80,7 +80,7 @@ contract('TeleportToken', (accounts) => {
   // List all oracles in console log
   for (let i = 0; i < TestSettings.oracles.length; i++) {
     const element = TestSettings.oracles[i];
-    console.log(element.eosio_name, element.keys.ethAddress);
+    console.log(element.eosio_name, `${element.keys.ethAddress} ${element.keys.eosioPrivate}`);
   }
 
   it('Total supply', async () => {

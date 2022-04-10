@@ -12,7 +12,7 @@ export class EosApi{
         this.gotRightInfo = Array(endpointList.length).fill(false)
         this.endpointList = endpointList.map(ep => {
             const lastIndex = ep.length - 1
-            return ep.at(lastIndex) == '/' ? ep.substring(0, lastIndex) : ep
+            return ep[lastIndex] == '/' ? ep.substring(0, lastIndex) : ep
         })  
     }
 

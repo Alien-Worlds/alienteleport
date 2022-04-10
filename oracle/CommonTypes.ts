@@ -39,3 +39,19 @@ export interface TeleportTableEntry{
     signatures: Array<string>, 
     claimed: boolean
 }
+
+export interface eosio_claim_data {
+    oracle_name: string;
+    id: string;
+    to_eth: string;
+    quantity: string;
+}
+  
+export interface eosio_teleport_data {
+    oracle_name: string;
+    to: string;
+    ref: string;
+    quantity: string;
+    chain_id: string;
+    confirmed: boolean;
+}

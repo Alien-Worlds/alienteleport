@@ -72,7 +72,7 @@ var EosApi = /** @class */ (function () {
         this.gotRightInfo = Array(endpointList.length).fill(false);
         this.endpointList = endpointList.map(function (ep) {
             var lastIndex = ep.length - 1;
-            return ep.at(lastIndex) == '/' ? ep.substring(0, lastIndex) : ep;
+            return ep[lastIndex] == '/' ? ep.substring(0, lastIndex) : ep;
         });
     }
     /**

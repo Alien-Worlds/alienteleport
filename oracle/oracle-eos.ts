@@ -58,10 +58,10 @@ class EosOracle{
     public running = false
     private irreversible_time = 0
     // private current_block_time = 0
-    static maxWait = 180
+    static maxWait = 180    // The max amount of seconds to wait to check an entry again if it is irreversible now
 
     constructor(private config: ConfigType, private signatureProvider: JsSignatureProvider){
-        this.eos_api = new EosApi(config.eos.chainId, config.eos.endpoints, signatureProvider)
+        this.eos_api = new EosApi(this.config.eos.chainId, this.config.eos.endpoints, this.signatureProvider)
     }
     
     // static async tryHard(tries: number, action : (tryNumber?: number) => Promise<boolean | any>, onCatch: (e?: any, tryNumber?: number) => boolean | undefined) {
@@ -201,7 +201,7 @@ class EosOracle{
             textEncoder: new TextEncoder,
             textDecoder: new TextDecoder
         });
-        sb.pushNumberAsUint64(teleport.id)
+        sb.pushNumberAsUint64(teleport.id) // TODO: use bigint
         sb.pushUint32(teleport.time)
         sb.pushName(teleport.account)
         sb.pushAsset(teleport.quantity)
@@ -436,7 +436,7 @@ class EosOracle{
      * @param requestAmount Amount of requested teleports per request
      */
     async run(id = 0, requestAmount = 100){
-        console.log(`Starting EOS watcher for ETH oracle ${this.config.eth.oracleAccount}`);
+        console.log(`Starting EOS watcher for ETH oracle ${this.config.eth.oracleAccount}`)
         
         // Create an object to change the current id on each run
         this.running = true
@@ -468,14 +468,9 @@ const argv = yargs
         description: 'Amount of handled teleports per requests',
         type: 'number'
     })
-    // .option('block', {
-    //     alias: 'b',
-    //     description: 'Block number to start with',
-    //     type: 'number'
-    // })
     .option('signs', {
         alias: 's',
-        description: 'Amout of signatures until this oracle will signs too',
+        description: 'Amount of signatures until this oracle will sign too',
         type: 'number'
     })
     .option('config', {
@@ -496,6 +491,8 @@ process.title = `oracle-eos ${config_path}`
 const configFile : ConfigType = require(config_path)
 
 // Configure eosjs specific propperties
-const signatureProvider = new JsSignatureProvider([configFile.eos.privateKey]);
-let eosOracle = new EosOracle(configFile, signatureProvider)
+const signatureProvider = new JsSignatureProvider([configFile.eos.privateKey])
+const eosOracle = new EosOracle(configFile, signatureProvider)
+
+// Run the process
 eosOracle.run(argv.id, argv.amount);

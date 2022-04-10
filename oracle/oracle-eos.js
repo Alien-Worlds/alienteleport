@@ -94,7 +94,7 @@ var EosOracle = /** @class */ (function () {
         this.signatureProvider = signatureProvider;
         this.running = false;
         this.irreversible_time = 0;
-        this.eos_api = new eosEndpointSwitcher_1.EosApi(config.eos.chainId, config.eos.endpoints, signatureProvider);
+        this.eos_api = new eosEndpointSwitcher_1.EosApi(this.config.eos.chainId, this.config.eos.endpoints, this.signatureProvider);
     }
     // static async tryHard(tries: number, action : (tryNumber?: number) => Promise<boolean | any>, onCatch: (e?: any, tryNumber?: number) => boolean | undefined) {
     //     let tryI = 0
@@ -270,7 +270,7 @@ var EosOracle = /** @class */ (function () {
             textEncoder: new text_encoding_1.TextEncoder,
             textDecoder: new text_encoding_1.TextDecoder
         });
-        sb.pushNumberAsUint64(teleport.id);
+        sb.pushNumberAsUint64(teleport.id); // TODO: use bigint
         sb.pushUint32(teleport.time);
         sb.pushName(teleport.account);
         sb.pushAsset(teleport.quantity);
@@ -600,7 +600,7 @@ var EosOracle = /** @class */ (function () {
         });
     };
     // private current_block_time = 0
-    EosOracle.maxWait = 180;
+    EosOracle.maxWait = 180; // The max amount of seconds to wait to check an entry again if it is irreversible now
     return EosOracle;
 }());
 // Handle params from console
@@ -616,14 +616,9 @@ var argv = yargs_1.default
     description: 'Amount of handled teleports per requests',
     type: 'number'
 })
-    // .option('block', {
-    //     alias: 'b',
-    //     description: 'Block number to start with',
-    //     type: 'number'
-    // })
     .option('signs', {
     alias: 's',
-    description: 'Amout of signatures until this oracle will signs too',
+    description: 'Amount of signatures until this oracle will sign too',
     type: 'number'
 })
     .option('config', {
@@ -639,4 +634,5 @@ var configFile = require(config_path);
 // Configure eosjs specific propperties
 var signatureProvider = new eosjs_jssig_1.JsSignatureProvider([configFile.eos.privateKey]);
 var eosOracle = new EosOracle(configFile, signatureProvider);
+// Run the process
 eosOracle.run(argv.id, argv.amount);

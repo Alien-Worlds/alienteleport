@@ -11,7 +11,7 @@ import { ethers } from 'ethers'
 import yargs from 'yargs'
 import { ConfigType, eosio_claim_data, eosio_teleport_data } from './CommonTypes'
 import { JsSignatureProvider } from 'eosjs/dist/eosjs-jssig'
-import { EosApi } from './eosEndpointSwitcher'
+import { EosApi, EthApi } from './EndpointSwitcher'
 import { TransactResult } from 'eosjs/dist/eosjs-api-interfaces'
 
 type EthDataConfig = {precision: number, symbol: string, eos:{oracleAccount: string}}
@@ -22,21 +22,25 @@ type EthDataConfig = {precision: number, symbol: string, eos:{oracleAccount: str
  */
  const sleep = async (ms: number) => {
     return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
-};
+        setTimeout(resolve, ms)
+    })
+}
 
 class EthOracle {
     public running = false
     private claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17'
     private teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5'
-    private DEFAULT_BLOCKS_TO_WAIT = 1 //- 5
+    private DEFAULT_BLOCKS_TO_WAIT = 5
     private blocks_file_name : string
     private eos_api: EosApi
+    private eth_api: EthApi
+    private minTrySend = 3
 
-    constructor(private config: ConfigType, private ethProvider: ethers.providers.StaticJsonRpcProvider, private signatureProvider: JsSignatureProvider){
+    constructor(private config: ConfigType, private signatureProvider: JsSignatureProvider){
         this.blocks_file_name = `.oracle_${configFile.eth.network}_block-${configFile.eth.oracleAccount}`
         this.eos_api = new EosApi(this.config.eos.chainId, this.config.eos.endpoints, this.signatureProvider)
+        this.eth_api = new EthApi(this.config.eth.chainId, this.config.eth.endpoints)
+        this.minTrySend = Math.max(this.minTrySend, config.eos.endpoints.length)
     }
 
     /**
@@ -46,8 +50,6 @@ class EthOracle {
      * @returns 
      */
     static extractEthClaimedData (data: ethers.utils.Result, config: EthDataConfig): eosio_claim_data {
-        console.log('data[0]',data[0])
-        
         const id = data[0].toNumber() // TODO: .toBigInt()
         const to_eth = data[1].replace('0x', '') + '000000000000000000000000'
         const quantity = (data[2].toNumber() / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol
@@ -61,42 +63,84 @@ class EthOracle {
      * @returns 
      */
     static extractEthTeleportData(data: ethers.utils.Result, transactionHash: string, config: EthDataConfig): eosio_teleport_data {
-        const tokens = data[1].toNumber();
+        const tokens = data[1].toNumber()
         if (tokens <= 0) {
             throw new Error('Tokens are less than or equal to 0')
         }
         const to = data[0]
-        const chain_id = data[2].toNumber();
+        const chain_id = data[2].toNumber()
         const amount = (tokens / Math.pow(10, config.precision)).toFixed(
             config.precision
         )
-        const quantity = `${amount} ${config.symbol}`;
-        const txid = transactionHash.replace(/^0x/, '');
+        const quantity = `${amount} ${config.symbol}`
+        const txid = transactionHash.replace(/^0x/, '')
       
-        return { chain_id, confirmed: true, quantity, to, oracle_name: config.eos.oracleAccount, ref: txid };
+        return { chain_id, confirmed: true, quantity, to, oracle_name: config.eos.oracleAccount, ref: txid }
     }
 
-    async await_confirmation(txid: string) {
-        return new Promise(async (resolve) => {
-            let resolved = false;
-            while (!resolved) {
-                this.ethProvider.getTransactionReceipt(txid).then((receipt) => {
-                    console.log(`Cofirmations ${receipt.confirmations}`) //-
-                    
-                    if (receipt && receipt.confirmations > this.DEFAULT_BLOCKS_TO_WAIT) {
-                        console.log(`TX ${txid} has ${receipt.confirmations} confirmations`)
-                        resolve(receipt);
-                        resolved = true;
+    /**
+     * Wait until an event got enough confirmations and validations by other endpoints
+     * @param entry.transactionHash Hash of the transaction which contains the event
+     * @param entry.data Event data in raw format
+     * @returns False if there are not enough endpoints which validate the event
+     */
+    async await_confirmation(entry:{ transactionHash: string, data: string}) {
+        let validators = new Set()
+        if(this.eth_api.get_EndpointAmount() < this.config.eth.epVerifications){
+            throw Error('Not enough eth endpoints for validation ❌')
+        }
+
+        let firstEp = undefined
+        while (true) {
+            try{
+                const receipt = await this.eth_api.getProvider().getTransactionReceipt(entry.transactionHash)
+                
+                if(receipt){
+                    const overConfs = receipt.confirmations - this.DEFAULT_BLOCKS_TO_WAIT
+                    if (overConfs > 0) {
+                        let ep = this.eth_api.getEndpoint()
+                        validators.add(ep)
+                        
+                        if(receipt.logs.find(e=>{ return e.data == entry.data}) == undefined){
+                            console.log(`Event data of ${entry.transactionHash} was not found by ${ep} ❌`)
+                            return false
+                        }
+
+                        console.log(`Cofirmations ${receipt.confirmations} by ${ep}`)
+    
+                        if(validators.size >= this.config.eth.epVerifications){
+                            console.log(`TX ${entry.transactionHash} has ${receipt.confirmations} confirmations`)
+                            return true
+                        }
+    
+                        // If one endpoint reaches one more confirmations as needed, check each endpoint again and thow an error if they still not confirm   
+                        if(overConfs > 1){
+                            if(firstEp == undefined){
+                                firstEp = ep
+                            } else if(firstEp == ep){
+                                console.error(`Verification failed, only ${validators.size} eth endpoints verified the transaction ${entry.transactionHash} ❌`);
+                                return false
+                            }
+                            // Do not sleep to check all other endpoints after reaching one more confirmation than needed
+                        } else {
+                            // Sleep one second to check other endpoints if the confirmation amount is just reached
+                            await sleep(1000)
+                        }
                     }
-                })
-                await sleep(10000);
+                } else {
+                    await sleep(10000)
+                }
+            } catch (e) {
+                console.error('Error on get transaction receipt', e);
+                await sleep(1000)
             }
-        })
+            await this.eth_api.nextEndpoint()
+        }
     }
 
     static async save_block_to_file(block_num: number, blocks_file: string){
         fs.writeFileSync(blocks_file, block_num.toString())
-    };
+    }
 
     /**
      * Check for "claimed" events and store them on eosio chain
@@ -112,17 +156,25 @@ class EthOracle {
             address: this.config.eth.teleportContract,
             topics: [this.claimed_topic],
         }
-        const res = await this.ethProvider.getLogs(query);
+        const res = await this.eth_api.getProvider().getLogs(query)
       
         // Mark each claimed event on eosio chain as claimed
-        for await (const { transactionHash, data } of res) {
+        for await (const entry of res) {
             // Extract data from eth claimed event
-            const decodedData = ethers.utils.defaultAbiCoder.decode(['uint64', 'address', 'uint'], data);
-            const eosioData = EthOracle.extractEthClaimedData(decodedData, this.config);
-            console.log('claimed eosioData', eosioData);
-            
+            const decodedData = ethers.utils.defaultAbiCoder.decode(['uint64', 'address', 'uint'], entry.data)
+            const eosioData = EthOracle.extractEthClaimedData(decodedData, this.config)
+
             // Wait for confirmation of each transaction before continuing
-            await this.await_confirmation(transactionHash);
+            if(!await this.await_confirmation(entry)){
+                console.log(`Skip claimed event with ${eosioData.to_eth} as recipient and the id ${eosioData.id}`)
+                continue
+            }
+
+            // Continue this event if it was marked as removed
+            if(entry.removed){
+                console.log(`Claimed event with trx hash ${entry.transactionHash} got removed and will be skipped ❌`)
+                continue
+            }
 
             // Create action
             const actions = [{
@@ -136,31 +188,45 @@ class EthOracle {
             }]
         
             // Send transaction on eosio chain
+            const eos_res = await this.sendTransaction(actions, trxBroadcast)
+            if(eos_res === false){
+                console.log(`Skip sending claimed of id ${eosioData.id} to the eosio chain ❌`)
+            } else if(eos_res === true){
+                console.log(`Id ${eosioData.id} is already claimed, account 0x${eosioData.to_eth.substring(0, 40)}, quantity ${eosioData.quantity} ✔️`)
+            } else {
+                console.log(`Send claimed of id ${eosioData.id}, account 0x${eosioData.to_eth.substring(0, 40)}, quantity ${eosioData.quantity
+                }. EOSIO blocknumber ${eos_res.processed.block_num} and trx id ${eos_res.transaction_id} ✔️`);
+            }
+        }
+    }
+
+    /**
+     * Send transaction to EOSIO chain
+     * @param actions EOSIO transaction actions
+     * @param trxBroadcast Boolean to broadcast a transaction
+     * @returns False if it fails, true if a transaction was already marked as claimed or the object of the transaction result
+     */
+    async sendTransaction(actions: any, trxBroadcast: boolean = true){
+        for(let tries = 0; tries < this.minTrySend; tries++){
             try {
-                console.log(`Send claimed: ${this.config.eos.endpoints[0]}  submit: ${trxBroadcast} pk: ${this.config.eos.privateKey}`, actions); //-
-                
-                const eos_res = await this.eos_api.getAPI().transact({ 
-                      actions 
-                  }, { 
-                      blocksBehind: 3, 
-                      expireSeconds: 30, 
-                      broadcast: trxBroadcast 
-                }) as TransactResult
-          
-                console.log(`Sent notification of claim with txid ${eos_res.transaction_id}, for ID ${eosioData.id
-                }, account 0x${eosioData.to_eth.substring(0, 40)}, quantity ${eosioData.quantity}`)
-          
-                console.log('Claimed result', eos_res); //-
-          
+                const eos_res = await this.eos_api.getAPI().transact({ actions }, { 
+                    blocksBehind: 3, 
+                    expireSeconds: 30, 
+                    broadcast: trxBroadcast 
+                }) as TransactResult                
+                return eos_res
             } catch (e: any) {
-                // Check if the error appears because the transaction is already claimed
-                if (e.message.indexOf('Already marked as claimed') > -1) {
-                    console.log(`ID ${eosioData.id} is already claimed, account 0x${eosioData.to_eth.substring(0, 40)}, quantity ${eosioData.quantity} ✔️`)
+                // Check if the error appears because the transaction is already claimed or approved
+                if (e.message.indexOf('Already marked as claimed') > -1 || e.message.indexOf('Oracle has already approved') > -1) {
+                    return true
                 } else {
-                    console.error(`Error sending confirm ${e.message} ❌`)
+                    console.error(`Error while sending to eosio chain with ${this.eos_api}: ${e.message} ❌`)
+                    await this.eos_api.nextEndpoint()
+                    await sleep(1000)
                 }
             }
         }
+        return false
     }
 
     /**
@@ -177,16 +243,27 @@ class EthOracle {
           address: this.config.eth.teleportContract,
           topics: [this.teleport_topic],
         }
-        const res = await this.ethProvider.getLogs(query)
+        const res = await this.eth_api.getProvider().getLogs(query)
       
         // Confirm each teleport event on eosio chain
-        for await (const { transactionHash, data } of res) {
+        for await (const entry of res) {
             // Extract data from teleport eth event
-            const decodedData = ethers.utils.defaultAbiCoder.decode(['string', 'uint', 'uint'], data)
-            const eosioData = EthOracle.extractEthTeleportData(decodedData, transactionHash, this.config)
+            const decodedData = ethers.utils.defaultAbiCoder.decode(['string', 'uint', 'uint'], entry.data)
+            const eosioData = EthOracle.extractEthTeleportData(decodedData, entry.transactionHash, this.config)
         
             // Wait for confirmation of each transaction before continuing
-            await this.await_confirmation(transactionHash);
+            if(!await this.await_confirmation(entry)){
+                console.log(`Skip teleport event with ${eosioData.to} as recipient and ref of ${eosioData.ref}`)
+                continue
+            }
+
+            // Continue this event if it was marked as removed
+            if(entry.removed){
+                console.log(`Teleport with trx hash ${entry.transactionHash} got removed and will be skipped ❌`)
+                continue
+            }
+
+            // Create action
             const actions = [{
                 account: this.config.eos.teleportContract,
                 name: 'received',
@@ -198,24 +275,15 @@ class EthOracle {
             }]
         
             // Send transaction on eosio chain
-            try {
-                const eos_res = await this.eos_api.getAPI().transact({ 
-                      actions 
-                  }, { 
-                      blocksBehind: 3, 
-                      expireSeconds: 30, 
-                      broadcast: trxBroadcast 
-                }) as TransactResult
-          
-                console.log(`Sent notification of teleport with txid ${eos_res.transaction_id}`);
-            } catch (e: any) {
-                if (e.message.indexOf('Oracle has already approved') > -1) {
-                  console.log('Oracle has already approved ✔️')
-                } else {
-                    console.error(`Error sending teleport ${e.message} ❌`)
-                }
+            const eos_res = await this.sendTransaction(actions, trxBroadcast)
+            if(eos_res === false){
+                console.log(`Skip sending teleport to ${eosioData.to} with ref ${eosioData.ref} and quantity of ${eosioData.quantity} ❌`)
+            } else if(eos_res === true){
+                console.log(`Oracle has already approved teleport to ${eosioData.to} with ref ${eosioData.ref} and quantity of ${eosioData.quantity} ✔️`)
+            } else {
+                console.log(`Send teleport to ${eosioData.to} with ref ${eosioData.ref} and quantity of ${eosioData.quantity
+                }. EOSIO blocknumber ${eos_res.processed.block_num} and trx id ${eos_res.transaction_id} ✔️`);
             }
-            await sleep(500);
         }
     }
 
@@ -224,7 +292,7 @@ class EthOracle {
      * @returns a saved block number from a file
      */
     static async load_block_number_from_file(blocks_file: string) {
-        //   let block_number: string | number = 'latest';
+        //   let block_number: string | number = 'latest'
         if (!fs.existsSync(blocks_file))
             throw new Error('block file does not exist.')
 
@@ -234,7 +302,32 @@ class EthOracle {
         const block_number = parseInt(file_contents)
         if (isNaN(block_number)) throw new Error('No block number in file.')
 
-        return block_number;
+        return block_number
+    }
+
+    /**
+     * Get latest block of eth blockchain
+     * @returns latest block number
+     */
+    private async getLatestBlock() {
+       let tries = 0
+       while(true) {
+           try{
+               const block = await this.eth_api.getProvider().getBlock('latest')               
+               return block.number
+           } catch(e){
+               if(tries >= this.eth_api.get_EndpointAmount()){
+                   console.log('Could not get latest block by any eth endpoint ❌')
+                   return undefined
+               } else {
+                   console.error(`Could not get latest block with ${this.eth_api.getEndpoint()} ❌`)
+                   await this.eth_api.nextEndpoint()
+                   console.log(`Try ${this.eth_api.getEndpoint()} in a second...`)
+                   tries++                   
+                   await sleep(1000)
+               }
+           }
+       }
     }
 
     /**
@@ -243,29 +336,41 @@ class EthOracle {
      * @param trxBroadcast False if transactions should not be broadcasted (not submitted to the block chain)
      */
     async run(start_ref: 'latest' | number, trxBroadcast: boolean = true){
-      let from_block: number | undefined;
-      this.running = true
-      try{
-          while (this.running) {
-              try {
-                const block = await this.ethProvider.getBlock('latest');
-                const latest_block = block.number;
+        let from_block: number | undefined
+        this.running = true
+        await this.eth_api.nextEndpoint()
 
+        while (this.running) {
+            try {
+                // Get latest block from chain
+                const latest_block = await this.getLatestBlock()
+                if(typeof latest_block != 'number'){
+                    console.error('Latest block number is not a number', latest_block)
+                    return
+                }
+
+                // Get block number to start from
                 if (!from_block) {
-                  if (start_ref === 'latest') {
-                    try {
-                        from_block = await EthOracle.load_block_number_from_file(this.blocks_file_name);
-                        from_block -= 50;                   // for fresh start go back 50 blocks
-                        console.log(`Starting from saved block with additional previous 50 blocks for safety: ${from_block}.`);
-                    } catch (err) {
-                        console.log('Could not get block from file and it was not specified ❌');
-                        from_block = latest_block - 100     // go back 100 blocks from latest
+                    if (start_ref === 'latest') {
+                        try {
+                            from_block = await EthOracle.load_block_number_from_file(this.blocks_file_name)
+                            from_block -= 50                     // for fresh start go back 50 blocks
+                            console.log(`Starting from saved block with additional previous 50 blocks for safety: ${from_block}.`)
+                        } catch (err) {
+                            console.log('Could not get block from file and it was not specified ❌')
+                            if(this.config.eth.genesisBlock){
+                                from_block = this.config.eth.genesisBlock
+                                console.log('Start by genesis block.')
+                            } else {
+                                from_block = latest_block - 100     // go back 100 blocks from latest
+                                console.log('Start 100 blocks before the latest block.')
+                            }
+                        }
+                    } else if (typeof start_ref === 'number') {
+                            from_block = start_ref
+                    } else {
+                        from_block = this.config.eth.genesisBlock
                     }
-                  } else if (typeof start_ref === 'number') {
-                      from_block = start_ref;
-                  } else {
-                      from_block = this.config.eth.genesisBlock;
-                  }
                 }
                 if(from_block < 0){
                     from_block = 0
@@ -275,61 +380,58 @@ class EthOracle {
 
                 if (start_ref >= latest_block) {
                     console.log(`Up to date at block ${to_block}`)
-                    await sleep(10000);
+                    await sleep(10000)
                 }
                 console.log(`Getting events from block ${from_block} to ${to_block}`)
 
                 await this.process_claimed(from_block, to_block, trxBroadcast)
                 await this.process_teleported(from_block, to_block, trxBroadcast)
 
-                from_block = to_block;
+                from_block = to_block
 
                 // Save last block received
                 await EthOracle.save_block_to_file(to_block, this.blocks_file_name)
 
                 if (latest_block - from_block <= 1000) {
-                    console.log('Waiting...');
-                    await sleep(30000);
+                    await EthOracle.WaitWithAnimation(30, 'Wait for new blocks...')
                 } else {
                     console.log(`Not waiting... ${latest_block} - ${from_block}`)
                 }
-              } catch (e: any) {
-                  console.error('⚡️ ' + e.message)
+            } catch (e: any) {
+                console.error('⚡️ ' + e.message)
 
-                  console.error('Try again in 5 seconds')
-                  await sleep(5000)
-              }
-          }
-      } catch (e){
-        console.error('⚡️ ' + e);
+                console.error('Try again in 5 seconds')
+                await sleep(5000)
+            }
+            // Select the next endpoint to distribute the requests
+            await this.eos_api.nextEndpoint()
+        }
     }
-        console.log('Thread closed 💀')
-    }
+
+    /**
+     * Wait for a defined amount of time and show remaining seconds
+     * @param s Seconds to wait
+     */
+         static async WaitWithAnimation(s: number, info: string = ""){
+            process.stdout.write(info + "\n\x1b[?25l")
+            for(let i = 0; i < s; i++){
+                process.stdout.write(`💤 ${i} s / ${s} s 💤`)
+                await sleep(1000)
+                process.stdout.write("\r\x1b[K")
+            }
+            
+            process.stdout.moveCursor(0, -1) // up one line
+            process.stdout.clearLine(1) // from cursor to end
+        }
 }
 
 // Handle params from console
 const argv = yargs
     .version().alias('version', 'v')
-    // .option('id', {
-    //     alias: 'n',
-    //     description: 'Teleport id to start from',
-    //     type: 'number'
-    // })
-    // .option('amount', {
-    //     alias: 'a',
-    //     description: 'Amount of handled teleports per requests',
-    //     type: 'number'
-    // })
     .option('block', {
         alias: 'b',
         description: 'Block number to start scanning from',
-        type: 'number'
     })
-    // .option('signs', {
-    //     alias: 's',
-    //     description: 'Amount of signatures until this oracle will sign too',
-    //     type: 'number'
-    // })
     .option('config', {
         alias: 'c',
         description: 'Path of config file',
@@ -342,39 +444,36 @@ const argv = yargs
       default: true,
     })
     .help().alias('help', 'h').argv as {
-        // id: number,
         block: number,
-        // signs: number,
         config: string,
         broadcast: boolean,
-    };
-
+    }
+    
 // Load config and set title
 const config_path = argv.config || process.env['CONFIG'] || './config'
 process.title = `oracle-eth ${config_path}`
 const configFile : ConfigType = require(config_path)
 
 // Check and set start parameters
-let startRef: 'latest' | number = 'latest'
-if(argv.block) {
-    startRef = argv.block;
+let startRef: 'latest' | number = 'latest' 
+if(typeof argv.block == 'number' || argv.block == 'latest') {
+    startRef = argv.block
 } else if(process.env['START_BLOCK']) {
     const start_block_env = parseInt(process.env['START_BLOCK'])
     if(isNaN(start_block_env)) {
-        console.error(`You must supply start block as an integer in env`)
-        process.exit(1);
+        console.error('You must supply start block as an integer in env')
+        process.exit(1)
     }
-    startRef = start_block_env;
+    startRef = start_block_env
 }
 if(configFile.eos.epVerifications > configFile.eos.endpoints.length){
-    console.error('Error: epVerifications cannot be greater than given amount of endpints')
+    console.error('Error: epVerifications cannot be greater than given amount of endpoints')
     process.exit(1)
 }
-const eosSigProvider = new JsSignatureProvider([configFile.eos.privateKey])
-const ethProvider = new ethers.providers.StaticJsonRpcProvider(configFile.eth.endpoint)
 
 // Set up the oracle
-const ethOracle = new EthOracle(configFile, ethProvider, eosSigProvider)
+const eosSigProvider = new JsSignatureProvider([configFile.eos.privateKey])
+const ethOracle = new EthOracle(configFile, eosSigProvider)
 
 // Run the process
 ethOracle.run(startRef, argv.broadcast)

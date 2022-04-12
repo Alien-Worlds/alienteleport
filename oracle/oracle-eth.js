@@ -56,7 +56,7 @@ var fs_1 = __importDefault(require("fs"));
 var ethers_1 = require("ethers");
 var yargs_1 = __importDefault(require("yargs"));
 var eosjs_jssig_1 = require("eosjs/dist/eosjs-jssig");
-var eosEndpointSwitcher_1 = require("./eosEndpointSwitcher");
+var EndpointSwitcher_1 = require("./EndpointSwitcher");
 /**
  * Use this function with await to let the thread sleep for the defined amount of time
  * @param ms Milliseconds
@@ -69,16 +69,18 @@ var sleep = function (ms) { return __awaiter(void 0, void 0, void 0, function ()
     });
 }); };
 var EthOracle = /** @class */ (function () {
-    function EthOracle(config, ethProvider, signatureProvider) {
+    function EthOracle(config, signatureProvider) {
         this.config = config;
-        this.ethProvider = ethProvider;
         this.signatureProvider = signatureProvider;
         this.running = false;
         this.claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
         this.teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
-        this.DEFAULT_BLOCKS_TO_WAIT = 1; //- 5
+        this.DEFAULT_BLOCKS_TO_WAIT = 5;
+        this.minTrySend = 3;
         this.blocks_file_name = ".oracle_".concat(configFile.eth.network, "_block-").concat(configFile.eth.oracleAccount);
-        this.eos_api = new eosEndpointSwitcher_1.EosApi(this.config.eos.chainId, this.config.eos.endpoints, this.signatureProvider);
+        this.eos_api = new EndpointSwitcher_1.EosApi(this.config.eos.chainId, this.config.eos.endpoints, this.signatureProvider);
+        this.eth_api = new EndpointSwitcher_1.EthApi(this.config.eth.chainId, this.config.eth.endpoints);
+        this.minTrySend = Math.max(this.minTrySend, config.eos.endpoints.length);
     }
     /**
      * Get object of the data of an "claimed"-event on eth chain
@@ -87,7 +89,6 @@ var EthOracle = /** @class */ (function () {
      * @returns
      */
     EthOracle.extractEthClaimedData = function (data, config) {
-        console.log('data[0]', data[0]);
         var id = data[0].toNumber(); // TODO: .toBigInt()
         var to_eth = data[1].replace('0x', '') + '000000000000000000000000';
         var quantity = (data[2].toNumber() / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol;
@@ -111,36 +112,81 @@ var EthOracle = /** @class */ (function () {
         var txid = transactionHash.replace(/^0x/, '');
         return { chain_id: chain_id, confirmed: true, quantity: quantity, to: to, oracle_name: config.eos.oracleAccount, ref: txid };
     };
-    EthOracle.prototype.await_confirmation = function (txid) {
+    /**
+     * Wait until an event got enough confirmations and validations by other endpoints
+     * @param entry.transactionHash Hash of the transaction which contains the event
+     * @param entry.data Event data in raw format
+     * @returns False if there are not enough endpoints which validate the event
+     */
+    EthOracle.prototype.await_confirmation = function (entry) {
         return __awaiter(this, void 0, void 0, function () {
-            var _this = this;
+            var validators, firstEp, receipt, overConfs, ep, e_1;
             return __generator(this, function (_a) {
-                return [2 /*return*/, new Promise(function (resolve) { return __awaiter(_this, void 0, void 0, function () {
-                        var resolved;
-                        var _this = this;
-                        return __generator(this, function (_a) {
-                            switch (_a.label) {
-                                case 0:
-                                    resolved = false;
-                                    _a.label = 1;
-                                case 1:
-                                    if (!!resolved) return [3 /*break*/, 3];
-                                    this.ethProvider.getTransactionReceipt(txid).then(function (receipt) {
-                                        console.log("Cofirmations ".concat(receipt.confirmations)); //-
-                                        if (receipt && receipt.confirmations > _this.DEFAULT_BLOCKS_TO_WAIT) {
-                                            console.log("TX ".concat(txid, " has ").concat(receipt.confirmations, " confirmations"));
-                                            resolve(receipt);
-                                            resolved = true;
-                                        }
-                                    });
-                                    return [4 /*yield*/, sleep(10000)];
-                                case 2:
-                                    _a.sent();
-                                    return [3 /*break*/, 1];
-                                case 3: return [2 /*return*/];
-                            }
-                        });
-                    }); })];
+                switch (_a.label) {
+                    case 0:
+                        validators = new Set();
+                        if (this.eth_api.get_EndpointAmount() < this.config.eth.epVerifications) {
+                            throw Error('Not enough eth endpoints for validation ❌');
+                        }
+                        firstEp = undefined;
+                        _a.label = 1;
+                    case 1:
+                        if (!true) return [3 /*break*/, 14];
+                        _a.label = 2;
+                    case 2:
+                        _a.trys.push([2, 10, , 12]);
+                        return [4 /*yield*/, this.eth_api.getProvider().getTransactionReceipt(entry.transactionHash)];
+                    case 3:
+                        receipt = _a.sent();
+                        if (!receipt) return [3 /*break*/, 7];
+                        overConfs = receipt.confirmations - this.DEFAULT_BLOCKS_TO_WAIT;
+                        if (!(overConfs > 0)) return [3 /*break*/, 6];
+                        ep = this.eth_api.getEndpoint();
+                        validators.add(ep);
+                        if (receipt.logs.find(function (e) { return e.data == entry.data; }) == undefined) {
+                            console.log("Event data of ".concat(entry.transactionHash, " was not found by ").concat(ep, " \u274C"));
+                            return [2 /*return*/, false];
+                        }
+                        console.log("Cofirmations ".concat(receipt.confirmations, " by ").concat(ep));
+                        if (validators.size >= this.config.eth.epVerifications) {
+                            console.log("TX ".concat(entry.transactionHash, " has ").concat(receipt.confirmations, " confirmations"));
+                            return [2 /*return*/, true];
+                        }
+                        if (!(overConfs > 1)) return [3 /*break*/, 4];
+                        if (firstEp == undefined) {
+                            firstEp = ep;
+                        }
+                        else if (firstEp == ep) {
+                            console.error("Verification failed, only ".concat(validators.size, " eth endpoints verified the transaction ").concat(entry.transactionHash, " \u274C"));
+                            return [2 /*return*/, false];
+                        }
+                        return [3 /*break*/, 6];
+                    case 4: 
+                    // Sleep one second to check other endpoints if the confirmation amount is just reached
+                    return [4 /*yield*/, sleep(1000)];
+                    case 5:
+                        // Sleep one second to check other endpoints if the confirmation amount is just reached
+                        _a.sent();
+                        _a.label = 6;
+                    case 6: return [3 /*break*/, 9];
+                    case 7: return [4 /*yield*/, sleep(10000)];
+                    case 8:
+                        _a.sent();
+                        _a.label = 9;
+                    case 9: return [3 /*break*/, 12];
+                    case 10:
+                        e_1 = _a.sent();
+                        console.error('Error on get transaction receipt', e_1);
+                        return [4 /*yield*/, sleep(1000)];
+                    case 11:
+                        _a.sent();
+                        return [3 /*break*/, 12];
+                    case 12: return [4 /*yield*/, this.eth_api.nextEndpoint()];
+                    case 13:
+                        _a.sent();
+                        return [3 /*break*/, 1];
+                    case 14: return [2 /*return*/];
+                }
             });
         });
     };
@@ -152,7 +198,6 @@ var EthOracle = /** @class */ (function () {
             });
         });
     };
-    ;
     /**
      * Check for "claimed" events and store them on eosio chain
      * @param from_block Block number to start looking for events
@@ -160,12 +205,12 @@ var EthOracle = /** @class */ (function () {
      * @param trxBroadcast False if the transaction should not be broadcasted (not submitted to the block chain)
      */
     EthOracle.prototype.process_claimed = function (from_block, to_block, trxBroadcast) {
-        var e_1, _a;
+        var e_2, _a;
         if (trxBroadcast === void 0) { trxBroadcast = true; }
         return __awaiter(this, void 0, void 0, function () {
-            var query, res, res_1, res_1_1, _b, transactionHash, data, decodedData, eosioData, actions, eos_res, e_2, e_1_1;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            var query, res, res_1, res_1_1, entry, decodedData, eosioData, actions, eos_res, e_2_1;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
                     case 0:
                         query = {
                             fromBlock: from_block,
@@ -173,26 +218,34 @@ var EthOracle = /** @class */ (function () {
                             address: this.config.eth.teleportContract,
                             topics: [this.claimed_topic],
                         };
-                        return [4 /*yield*/, this.ethProvider.getLogs(query)];
+                        return [4 /*yield*/, this.eth_api.getProvider().getLogs(query)
+                            // Mark each claimed event on eosio chain as claimed
+                        ];
                     case 1:
-                        res = _c.sent();
-                        _c.label = 2;
+                        res = _b.sent();
+                        _b.label = 2;
                     case 2:
-                        _c.trys.push([2, 11, 12, 17]);
+                        _b.trys.push([2, 9, 10, 15]);
                         res_1 = __asyncValues(res);
-                        _c.label = 3;
+                        _b.label = 3;
                     case 3: return [4 /*yield*/, res_1.next()];
                     case 4:
-                        if (!(res_1_1 = _c.sent(), !res_1_1.done)) return [3 /*break*/, 10];
-                        _b = res_1_1.value, transactionHash = _b.transactionHash, data = _b.data;
-                        decodedData = ethers_1.ethers.utils.defaultAbiCoder.decode(['uint64', 'address', 'uint'], data);
+                        if (!(res_1_1 = _b.sent(), !res_1_1.done)) return [3 /*break*/, 8];
+                        entry = res_1_1.value;
+                        decodedData = ethers_1.ethers.utils.defaultAbiCoder.decode(['uint64', 'address', 'uint'], entry.data);
                         eosioData = EthOracle.extractEthClaimedData(decodedData, this.config);
-                        console.log('claimed eosioData', eosioData);
-                        // Wait for confirmation of each transaction before continuing
-                        return [4 /*yield*/, this.await_confirmation(transactionHash)];
+                        return [4 /*yield*/, this.await_confirmation(entry)];
                     case 5:
                         // Wait for confirmation of each transaction before continuing
-                        _c.sent();
+                        if (!(_b.sent())) {
+                            console.log("Skip claimed event with ".concat(eosioData.to_eth, " as recipient and the id ").concat(eosioData.id));
+                            return [3 /*break*/, 7];
+                        }
+                        // Continue this event if it was marked as removed
+                        if (entry.removed) {
+                            console.log("Claimed event with trx hash ".concat(entry.transactionHash, " got removed and will be skipped \u274C"));
+                            return [3 /*break*/, 7];
+                        }
                         actions = [{
                                 account: this.config.eos.teleportContract,
                                 name: 'claimed',
@@ -202,51 +255,88 @@ var EthOracle = /** @class */ (function () {
                                     }],
                                 data: eosioData,
                             }];
-                        _c.label = 6;
+                        return [4 /*yield*/, this.sendTransaction(actions, trxBroadcast)];
                     case 6:
-                        _c.trys.push([6, 8, , 9]);
-                        console.log("Send claimed: ".concat(this.config.eos.endpoints[0], "  submit: ").concat(trxBroadcast, " pk: ").concat(this.config.eos.privateKey), actions); //-
-                        return [4 /*yield*/, this.eos_api.getAPI().transact({
-                                actions: actions
-                            }, {
+                        eos_res = _b.sent();
+                        if (eos_res === false) {
+                            console.log("Skip sending claimed of id ".concat(eosioData.id, " to the eosio chain \u274C"));
+                        }
+                        else if (eos_res === true) {
+                            console.log("Id ".concat(eosioData.id, " is already claimed, account 0x").concat(eosioData.to_eth.substring(0, 40), ", quantity ").concat(eosioData.quantity, " \u2714\uFE0F"));
+                        }
+                        else {
+                            console.log("Send claimed of id ".concat(eosioData.id, ", account 0x").concat(eosioData.to_eth.substring(0, 40), ", quantity ").concat(eosioData.quantity, ". EOSIO blocknumber ").concat(eos_res.processed.block_num, " and trx id ").concat(eos_res.transaction_id, " \u2714\uFE0F"));
+                        }
+                        _b.label = 7;
+                    case 7: return [3 /*break*/, 3];
+                    case 8: return [3 /*break*/, 15];
+                    case 9:
+                        e_2_1 = _b.sent();
+                        e_2 = { error: e_2_1 };
+                        return [3 /*break*/, 15];
+                    case 10:
+                        _b.trys.push([10, , 13, 14]);
+                        if (!(res_1_1 && !res_1_1.done && (_a = res_1.return))) return [3 /*break*/, 12];
+                        return [4 /*yield*/, _a.call(res_1)];
+                    case 11:
+                        _b.sent();
+                        _b.label = 12;
+                    case 12: return [3 /*break*/, 14];
+                    case 13:
+                        if (e_2) throw e_2.error;
+                        return [7 /*endfinally*/];
+                    case 14: return [7 /*endfinally*/];
+                    case 15: return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /**
+     * Send transaction to EOSIO chain
+     * @param actions EOSIO transaction actions
+     * @param trxBroadcast Boolean to broadcast a transaction
+     * @returns False if it fails, true if a transaction was already marked as claimed or the object of the transaction result
+     */
+    EthOracle.prototype.sendTransaction = function (actions, trxBroadcast) {
+        if (trxBroadcast === void 0) { trxBroadcast = true; }
+        return __awaiter(this, void 0, void 0, function () {
+            var tries, eos_res, e_3;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        tries = 0;
+                        _a.label = 1;
+                    case 1:
+                        if (!(tries < this.minTrySend)) return [3 /*break*/, 10];
+                        _a.label = 2;
+                    case 2:
+                        _a.trys.push([2, 4, , 9]);
+                        return [4 /*yield*/, this.eos_api.getAPI().transact({ actions: actions }, {
                                 blocksBehind: 3,
                                 expireSeconds: 30,
                                 broadcast: trxBroadcast
                             })];
+                    case 3:
+                        eos_res = _a.sent();
+                        return [2 /*return*/, eos_res];
+                    case 4:
+                        e_3 = _a.sent();
+                        if (!(e_3.message.indexOf('Already marked as claimed') > -1 || e_3.message.indexOf('Oracle has already approved') > -1)) return [3 /*break*/, 5];
+                        return [2 /*return*/, true];
+                    case 5:
+                        console.error("Error while sending to eosio chain with ".concat(this.eos_api, ": ").concat(e_3.message, " \u274C"));
+                        return [4 /*yield*/, this.eos_api.nextEndpoint()];
+                    case 6:
+                        _a.sent();
+                        return [4 /*yield*/, sleep(1000)];
                     case 7:
-                        eos_res = _c.sent();
-                        console.log("Sent notification of claim with txid ".concat(eos_res.transaction_id, ", for ID ").concat(eosioData.id, ", account 0x").concat(eosioData.to_eth.substring(0, 40), ", quantity ").concat(eosioData.quantity));
-                        console.log('Claimed result', eos_res); //-
-                        return [3 /*break*/, 9];
-                    case 8:
-                        e_2 = _c.sent();
-                        // Check if the error appears because the transaction is already claimed
-                        if (e_2.message.indexOf('Already marked as claimed') > -1) {
-                            console.log("ID ".concat(eosioData.id, " is already claimed, account 0x").concat(eosioData.to_eth.substring(0, 40), ", quantity ").concat(eosioData.quantity, " \u2714\uFE0F"));
-                        }
-                        else {
-                            console.error("Error sending confirm ".concat(e_2.message, " \u274C"));
-                        }
-                        return [3 /*break*/, 9];
-                    case 9: return [3 /*break*/, 3];
-                    case 10: return [3 /*break*/, 17];
-                    case 11:
-                        e_1_1 = _c.sent();
-                        e_1 = { error: e_1_1 };
-                        return [3 /*break*/, 17];
-                    case 12:
-                        _c.trys.push([12, , 15, 16]);
-                        if (!(res_1_1 && !res_1_1.done && (_a = res_1.return))) return [3 /*break*/, 14];
-                        return [4 /*yield*/, _a.call(res_1)];
-                    case 13:
-                        _c.sent();
-                        _c.label = 14;
-                    case 14: return [3 /*break*/, 16];
-                    case 15:
-                        if (e_1) throw e_1.error;
-                        return [7 /*endfinally*/];
-                    case 16: return [7 /*endfinally*/];
-                    case 17: return [2 /*return*/];
+                        _a.sent();
+                        _a.label = 8;
+                    case 8: return [3 /*break*/, 9];
+                    case 9:
+                        tries++;
+                        return [3 /*break*/, 1];
+                    case 10: return [2 /*return*/, false];
                 }
             });
         });
@@ -258,12 +348,12 @@ var EthOracle = /** @class */ (function () {
      * @param trxBroadcast False if the transaction should not be broadcasted (not submitted to the block chain)
      */
     EthOracle.prototype.process_teleported = function (from_block, to_block, trxBroadcast) {
-        var e_3, _a;
+        var e_4, _a;
         if (trxBroadcast === void 0) { trxBroadcast = true; }
         return __awaiter(this, void 0, void 0, function () {
-            var query, res, res_2, res_2_1, _b, transactionHash, data, decodedData, eosioData, actions, eos_res, e_4, e_3_1;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            var query, res, res_2, res_2_1, entry, decodedData, eosioData, actions, eos_res, e_4_1;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
                     case 0:
                         query = {
                             fromBlock: from_block,
@@ -271,27 +361,34 @@ var EthOracle = /** @class */ (function () {
                             address: this.config.eth.teleportContract,
                             topics: [this.teleport_topic],
                         };
-                        return [4 /*yield*/, this.ethProvider.getLogs(query)
+                        return [4 /*yield*/, this.eth_api.getProvider().getLogs(query)
                             // Confirm each teleport event on eosio chain
                         ];
                     case 1:
-                        res = _c.sent();
-                        _c.label = 2;
+                        res = _b.sent();
+                        _b.label = 2;
                     case 2:
-                        _c.trys.push([2, 13, 14, 19]);
+                        _b.trys.push([2, 9, 10, 15]);
                         res_2 = __asyncValues(res);
-                        _c.label = 3;
+                        _b.label = 3;
                     case 3: return [4 /*yield*/, res_2.next()];
                     case 4:
-                        if (!(res_2_1 = _c.sent(), !res_2_1.done)) return [3 /*break*/, 12];
-                        _b = res_2_1.value, transactionHash = _b.transactionHash, data = _b.data;
-                        decodedData = ethers_1.ethers.utils.defaultAbiCoder.decode(['string', 'uint', 'uint'], data);
-                        eosioData = EthOracle.extractEthTeleportData(decodedData, transactionHash, this.config);
-                        // Wait for confirmation of each transaction before continuing
-                        return [4 /*yield*/, this.await_confirmation(transactionHash)];
+                        if (!(res_2_1 = _b.sent(), !res_2_1.done)) return [3 /*break*/, 8];
+                        entry = res_2_1.value;
+                        decodedData = ethers_1.ethers.utils.defaultAbiCoder.decode(['string', 'uint', 'uint'], entry.data);
+                        eosioData = EthOracle.extractEthTeleportData(decodedData, entry.transactionHash, this.config);
+                        return [4 /*yield*/, this.await_confirmation(entry)];
                     case 5:
                         // Wait for confirmation of each transaction before continuing
-                        _c.sent();
+                        if (!(_b.sent())) {
+                            console.log("Skip teleport event with ".concat(eosioData.to, " as recipient and ref of ").concat(eosioData.ref));
+                            return [3 /*break*/, 7];
+                        }
+                        // Continue this event if it was marked as removed
+                        if (entry.removed) {
+                            console.log("Teleport with trx hash ".concat(entry.transactionHash, " got removed and will be skipped \u274C"));
+                            return [3 /*break*/, 7];
+                        }
                         actions = [{
                                 account: this.config.eos.teleportContract,
                                 name: 'received',
@@ -301,52 +398,38 @@ var EthOracle = /** @class */ (function () {
                                     }],
                                 data: eosioData,
                             }];
-                        _c.label = 6;
+                        return [4 /*yield*/, this.sendTransaction(actions, trxBroadcast)];
                     case 6:
-                        _c.trys.push([6, 8, , 9]);
-                        return [4 /*yield*/, this.eos_api.getAPI().transact({
-                                actions: actions
-                            }, {
-                                blocksBehind: 3,
-                                expireSeconds: 30,
-                                broadcast: trxBroadcast
-                            })];
-                    case 7:
-                        eos_res = _c.sent();
-                        console.log("Sent notification of teleport with txid ".concat(eos_res.transaction_id));
-                        return [3 /*break*/, 9];
-                    case 8:
-                        e_4 = _c.sent();
-                        if (e_4.message.indexOf('Oracle has already approved') > -1) {
-                            console.log('Oracle has already approved ✔️');
+                        eos_res = _b.sent();
+                        if (eos_res === false) {
+                            console.log("Skip sending teleport to ".concat(eosioData.to, " with ref ").concat(eosioData.ref, " and quantity of ").concat(eosioData.quantity, " \u274C"));
+                        }
+                        else if (eos_res === true) {
+                            console.log("Oracle has already approved teleport to ".concat(eosioData.to, " with ref ").concat(eosioData.ref, " and quantity of ").concat(eosioData.quantity, " \u2714\uFE0F"));
                         }
                         else {
-                            console.error("Error sending teleport ".concat(e_4.message, " \u274C"));
+                            console.log("Send teleport to ".concat(eosioData.to, " with ref ").concat(eosioData.ref, " and quantity of ").concat(eosioData.quantity, ". EOSIO blocknumber ").concat(eos_res.processed.block_num, " and trx id ").concat(eos_res.transaction_id, " \u2714\uFE0F"));
                         }
-                        return [3 /*break*/, 9];
-                    case 9: return [4 /*yield*/, sleep(500)];
+                        _b.label = 7;
+                    case 7: return [3 /*break*/, 3];
+                    case 8: return [3 /*break*/, 15];
+                    case 9:
+                        e_4_1 = _b.sent();
+                        e_4 = { error: e_4_1 };
+                        return [3 /*break*/, 15];
                     case 10:
-                        _c.sent();
-                        _c.label = 11;
-                    case 11: return [3 /*break*/, 3];
-                    case 12: return [3 /*break*/, 19];
-                    case 13:
-                        e_3_1 = _c.sent();
-                        e_3 = { error: e_3_1 };
-                        return [3 /*break*/, 19];
-                    case 14:
-                        _c.trys.push([14, , 17, 18]);
-                        if (!(res_2_1 && !res_2_1.done && (_a = res_2.return))) return [3 /*break*/, 16];
+                        _b.trys.push([10, , 13, 14]);
+                        if (!(res_2_1 && !res_2_1.done && (_a = res_2.return))) return [3 /*break*/, 12];
                         return [4 /*yield*/, _a.call(res_2)];
-                    case 15:
-                        _c.sent();
-                        _c.label = 16;
-                    case 16: return [3 /*break*/, 18];
-                    case 17:
-                        if (e_3) throw e_3.error;
+                    case 11:
+                        _b.sent();
+                        _b.label = 12;
+                    case 12: return [3 /*break*/, 14];
+                    case 13:
+                        if (e_4) throw e_4.error;
                         return [7 /*endfinally*/];
-                    case 18: return [7 /*endfinally*/];
-                    case 19: return [2 /*return*/];
+                    case 14: return [7 /*endfinally*/];
+                    case 15: return [2 /*return*/];
                 }
             });
         });
@@ -359,7 +442,7 @@ var EthOracle = /** @class */ (function () {
         return __awaiter(this, void 0, void 0, function () {
             var file_contents, block_number;
             return __generator(this, function (_a) {
-                //   let block_number: string | number = 'latest';
+                //   let block_number: string | number = 'latest'
                 if (!fs_1.default.existsSync(blocks_file))
                     throw new Error('block file does not exist.');
                 file_contents = fs_1.default.readFileSync(blocks_file).toString();
@@ -373,6 +456,50 @@ var EthOracle = /** @class */ (function () {
         });
     };
     /**
+     * Get latest block of eth blockchain
+     * @returns latest block number
+     */
+    EthOracle.prototype.getLatestBlock = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var tries, block, e_5;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        tries = 0;
+                        _a.label = 1;
+                    case 1:
+                        if (!true) return [3 /*break*/, 10];
+                        _a.label = 2;
+                    case 2:
+                        _a.trys.push([2, 4, , 9]);
+                        return [4 /*yield*/, this.eth_api.getProvider().getBlock('latest')];
+                    case 3:
+                        block = _a.sent();
+                        return [2 /*return*/, block.number];
+                    case 4:
+                        e_5 = _a.sent();
+                        if (!(tries >= this.eth_api.get_EndpointAmount())) return [3 /*break*/, 5];
+                        console.log('Could not get latest block by any eth endpoint ❌');
+                        return [2 /*return*/, undefined];
+                    case 5:
+                        console.error("Could not get latest block with ".concat(this.eth_api.getEndpoint(), " \u274C"));
+                        return [4 /*yield*/, this.eth_api.nextEndpoint()];
+                    case 6:
+                        _a.sent();
+                        console.log("Try ".concat(this.eth_api.getEndpoint(), " in a second..."));
+                        tries++;
+                        return [4 /*yield*/, sleep(1000)];
+                    case 7:
+                        _a.sent();
+                        _a.label = 8;
+                    case 8: return [3 /*break*/, 9];
+                    case 9: return [3 /*break*/, 1];
+                    case 10: return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /**
      * Run the process of checking the eth chain for teleports and claims and store the state on ethe eosio chain
      * @param start_ref Block number to start from. String 'latest' to start from the latest block in block number file
      * @param trxBroadcast False if transactions should not be broadcasted (not submitted to the block chain)
@@ -380,24 +507,27 @@ var EthOracle = /** @class */ (function () {
     EthOracle.prototype.run = function (start_ref, trxBroadcast) {
         if (trxBroadcast === void 0) { trxBroadcast = true; }
         return __awaiter(this, void 0, void 0, function () {
-            var from_block, block, latest_block, err_1, to_block, e_5, e_6;
+            var from_block, latest_block, err_1, to_block, e_6;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         this.running = true;
-                        _a.label = 1;
+                        return [4 /*yield*/, this.eth_api.nextEndpoint()];
                     case 1:
-                        _a.trys.push([1, 23, , 24]);
+                        _a.sent();
                         _a.label = 2;
                     case 2:
-                        if (!this.running) return [3 /*break*/, 22];
+                        if (!this.running) return [3 /*break*/, 23];
                         _a.label = 3;
                     case 3:
                         _a.trys.push([3, 19, , 21]);
-                        return [4 /*yield*/, this.ethProvider.getBlock('latest')];
+                        return [4 /*yield*/, this.getLatestBlock()];
                     case 4:
-                        block = _a.sent();
-                        latest_block = block.number;
+                        latest_block = _a.sent();
+                        if (typeof latest_block != 'number') {
+                            console.error('Latest block number is not a number', latest_block);
+                            return [2 /*return*/];
+                        }
                         if (!!from_block) return [3 /*break*/, 10];
                         if (!(start_ref === 'latest')) return [3 /*break*/, 9];
                         _a.label = 5;
@@ -412,7 +542,14 @@ var EthOracle = /** @class */ (function () {
                     case 7:
                         err_1 = _a.sent();
                         console.log('Could not get block from file and it was not specified ❌');
-                        from_block = latest_block - 100; // go back 100 blocks from latest
+                        if (this.config.eth.genesisBlock) {
+                            from_block = this.config.eth.genesisBlock;
+                            console.log('Start by genesis block.');
+                        }
+                        else {
+                            from_block = latest_block - 100; // go back 100 blocks from latest
+                            console.log('Start 100 blocks before the latest block.');
+                        }
                         return [3 /*break*/, 8];
                     case 8: return [3 /*break*/, 10];
                     case 9:
@@ -449,8 +586,7 @@ var EthOracle = /** @class */ (function () {
                         // Save last block received
                         _a.sent();
                         if (!(latest_block - from_block <= 1000)) return [3 /*break*/, 17];
-                        console.log('Waiting...');
-                        return [4 /*yield*/, sleep(30000)];
+                        return [4 /*yield*/, EthOracle.WaitWithAnimation(30, 'Wait for new blocks...')];
                     case 16:
                         _a.sent();
                         return [3 /*break*/, 18];
@@ -459,21 +595,53 @@ var EthOracle = /** @class */ (function () {
                         _a.label = 18;
                     case 18: return [3 /*break*/, 21];
                     case 19:
-                        e_5 = _a.sent();
-                        console.error('⚡️ ' + e_5.message);
+                        e_6 = _a.sent();
+                        console.error('⚡️ ' + e_6.message);
                         console.error('Try again in 5 seconds');
                         return [4 /*yield*/, sleep(5000)];
                     case 20:
                         _a.sent();
                         return [3 /*break*/, 21];
-                    case 21: return [3 /*break*/, 2];
-                    case 22: return [3 /*break*/, 24];
-                    case 23:
-                        e_6 = _a.sent();
-                        console.error('⚡️ ' + e_6);
-                        return [3 /*break*/, 24];
-                    case 24:
-                        console.log('Thread closed 💀');
+                    case 21: 
+                    // Select the next endpoint to distribute the requests
+                    return [4 /*yield*/, this.eos_api.nextEndpoint()];
+                    case 22:
+                        // Select the next endpoint to distribute the requests
+                        _a.sent();
+                        return [3 /*break*/, 2];
+                    case 23: return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /**
+     * Wait for a defined amount of time and show remaining seconds
+     * @param s Seconds to wait
+     */
+    EthOracle.WaitWithAnimation = function (s, info) {
+        if (info === void 0) { info = ""; }
+        return __awaiter(this, void 0, void 0, function () {
+            var i;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        process.stdout.write(info + "\n\x1b[?25l");
+                        i = 0;
+                        _a.label = 1;
+                    case 1:
+                        if (!(i < s)) return [3 /*break*/, 4];
+                        process.stdout.write("\uD83D\uDCA4 ".concat(i, " s / ").concat(s, " s \uD83D\uDCA4"));
+                        return [4 /*yield*/, sleep(1000)];
+                    case 2:
+                        _a.sent();
+                        process.stdout.write("\r\x1b[K");
+                        _a.label = 3;
+                    case 3:
+                        i++;
+                        return [3 /*break*/, 1];
+                    case 4:
+                        process.stdout.moveCursor(0, -1); // up one line
+                        process.stdout.clearLine(1); // from cursor to end
                         return [2 /*return*/];
                 }
             });
@@ -484,26 +652,10 @@ var EthOracle = /** @class */ (function () {
 // Handle params from console
 var argv = yargs_1.default
     .version().alias('version', 'v')
-    // .option('id', {
-    //     alias: 'n',
-    //     description: 'Teleport id to start from',
-    //     type: 'number'
-    // })
-    // .option('amount', {
-    //     alias: 'a',
-    //     description: 'Amount of handled teleports per requests',
-    //     type: 'number'
-    // })
     .option('block', {
     alias: 'b',
     description: 'Block number to start scanning from',
-    type: 'number'
 })
-    // .option('signs', {
-    //     alias: 's',
-    //     description: 'Amount of signatures until this oracle will sign too',
-    //     type: 'number'
-    // })
     .option('config', {
     alias: 'c',
     description: 'Path of config file',
@@ -522,24 +674,23 @@ process.title = "oracle-eth ".concat(config_path);
 var configFile = require(config_path);
 // Check and set start parameters
 var startRef = 'latest';
-if (argv.block) {
+if (typeof argv.block == 'number' || argv.block == 'latest') {
     startRef = argv.block;
 }
 else if (process.env['START_BLOCK']) {
     var start_block_env = parseInt(process.env['START_BLOCK']);
     if (isNaN(start_block_env)) {
-        console.error("You must supply start block as an integer in env");
+        console.error('You must supply start block as an integer in env');
         process.exit(1);
     }
     startRef = start_block_env;
 }
 if (configFile.eos.epVerifications > configFile.eos.endpoints.length) {
-    console.error('Error: epVerifications cannot be greater than given amount of endpints');
+    console.error('Error: epVerifications cannot be greater than given amount of endpoints');
     process.exit(1);
 }
-var eosSigProvider = new eosjs_jssig_1.JsSignatureProvider([configFile.eos.privateKey]);
-var ethProvider = new ethers_1.ethers.providers.StaticJsonRpcProvider(configFile.eth.endpoint);
 // Set up the oracle
-var ethOracle = new EthOracle(configFile, ethProvider, eosSigProvider);
+var eosSigProvider = new eosjs_jssig_1.JsSignatureProvider([configFile.eos.privateKey]);
+var ethOracle = new EthOracle(configFile, eosSigProvider);
 // Run the process
 ethOracle.run(startRef, argv.broadcast);

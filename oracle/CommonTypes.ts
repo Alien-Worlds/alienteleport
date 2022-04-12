@@ -7,7 +7,7 @@ export interface ConfigType {
         network: string,
         // wsEndpoint: string,
         chainId: string,
-        endpoint: string,
+        endpoint?: string,
         endpoints: Array<string>,
         teleportContract: string,
         oracleAccount: string,
@@ -19,12 +19,14 @@ export interface ConfigType {
     eth: {
         network: string,
         // wsEndpoint: string,
-        chainId: string,
-        endpoint: string,
+        chainId: number,
+        endpoint?: string,
+        endpoints: Array<string>,
         teleportContract: string,
         oracleAccount: string,
         privateKey: string,
-        genesisBlock: number
+        genesisBlock: number,
+        epVerifications: number
     }
 }
 

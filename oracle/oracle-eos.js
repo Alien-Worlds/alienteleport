@@ -43,7 +43,7 @@ var eosjs_1 = require("eosjs");
 var eosjs_jssig_1 = require("eosjs/dist/eosjs-jssig");
 var text_encoding_1 = require("text-encoding");
 var ethereumjs_util_1 = require("ethereumjs-util");
-var eosEndpointSwitcher_1 = require("./eosEndpointSwitcher");
+var EndpointSwitcher_1 = require("./EndpointSwitcher");
 var yargs_1 = __importDefault(require("yargs"));
 /**
  * Convert an Uint8Array to an hex in string format
@@ -80,13 +80,13 @@ var sleep = function (ms) { return __awaiter(void 0, void 0, void 0, function ()
 //  * @returns True or false
 //  */
 // function arraysEqual(a: Uint8Array, b: Uint8Array) {
-//     if (a === b) return true;
-//     if (a == null || b == null) return false;
-//     if (a.length !== b.length) return false;
+//     if (a === b) return true
+//     if (a == null || b == null) return false
+//     if (a.length !== b.length) return false
 //     for (var i = 0; i < a.length; ++i) {
-//       if (a[i] !== b[i]) return false;
+//       if (a[i] !== b[i]) return false
 //     }
-//     return true;
+//     return true
 //   }
 var EosOracle = /** @class */ (function () {
     function EosOracle(config, signatureProvider) {
@@ -94,7 +94,7 @@ var EosOracle = /** @class */ (function () {
         this.signatureProvider = signatureProvider;
         this.running = false;
         this.irreversible_time = 0;
-        this.eos_api = new eosEndpointSwitcher_1.EosApi(this.config.eos.chainId, this.config.eos.endpoints, this.signatureProvider);
+        this.eos_api = new EndpointSwitcher_1.EosApi(this.config.eos.chainId, this.config.eos.endpoints, this.signatureProvider);
     }
     // static async tryHard(tries: number, action : (tryNumber?: number) => Promise<boolean | any>, onCatch: (e?: any, tryNumber?: number) => boolean | undefined) {
     //     let tryI = 0
@@ -241,7 +241,7 @@ var EosOracle = /** @class */ (function () {
     };
     // async function validateEntryByOtherEndpoints(id: number, logdata: Uint8Array, dataSize: number){
     //     if(config.eos.epVerifications > eos_api.get_EndpointAmount()){
-    //         console.error('Not enough endpoints to verify data');
+    //         console.error('Not enough endpoints to verify data')
     //         process.exit(1)
     //     }
     //     const lastEndpoint = eos_api.getEndpoint()
@@ -255,7 +255,7 @@ var EosOracle = /** @class */ (function () {
     //         if(!arraysEqual(logdata, veriData)){
     //             throw('Verification failed by' + eos_api.getEndpoint())
     //         }
-    //         console.log(`Teleport id ${id} verified ${i + 1} times`);
+    //         console.log(`Teleport id ${id} verified ${i + 1} times`)
     //     }
     // }
     /**
@@ -459,7 +459,7 @@ var EosOracle = /** @class */ (function () {
                                 console.error("Verification failed by ".concat(this.eos_api.getEndpoint(), ". \u26A0\uFE0F"));
                                 isVerifyed = false;
                             }
-                            // console.log(`Teleport id ${item.id}, verified ${i + 1} times`);
+                            // console.log(`Teleport id ${item.id}, verified ${i + 1} times`)
                         }
                         // Check time
                         if (item.time > this.irreversible_time) {

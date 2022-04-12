@@ -7,7 +7,7 @@ using namespace eosio;
 using namespace std;
 
 #define ORACLE_CONFIRMATIONS 3
-#define TOKEN_CONTRACT_STR "alien.worlds"
+#define TOKEN_CONTRACT_STR "exampletoken"
 #define TOKEN_CONTRACT name(TOKEN_CONTRACT_STR)
 
 namespace alienworlds {
@@ -76,10 +76,8 @@ private:
   };
   typedef multi_index<
       "receipts"_n, receipt_item,
-      indexed_by<"byref"_n, const_mem_fun<receipt_item, checksum256,
-                                          &receipt_item::by_ref>>,
-      indexed_by<"byto"_n,
-                 const_mem_fun<receipt_item, uint64_t, &receipt_item::by_to>>>
+      indexed_by<"byref"_n, const_mem_fun<receipt_item, checksum256, &receipt_item::by_ref>>,
+      indexed_by<"byto"_n, const_mem_fun<receipt_item, uint64_t, &receipt_item::by_to>>>
       receipts_table;
 
   deposits_table _deposits;

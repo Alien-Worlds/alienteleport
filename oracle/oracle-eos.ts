@@ -3,7 +3,7 @@ import { GetTableRowsResult } from 'eosjs/dist/eosjs-rpc-interfaces'
 import { JsSignatureProvider } from "eosjs/dist/eosjs-jssig"
 import { TextDecoder, TextEncoder } from "text-encoding"
 import { ecsign, keccak, toRpcSig } from "ethereumjs-util"
-import { EosApi } from './eosEndpointSwitcher'
+import { EosApi } from './EndpointSwitcher'
 import { ConfigType, TeleportTableEntry } from './CommonTypes'
 import yargs from 'yargs'
 
@@ -32,9 +32,9 @@ function fromHexString(hexString: string){
  */
 const sleep = async (ms: number) => {
     return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
-};
+        setTimeout(resolve, ms)
+    })
+}
 
 // /**
 //  * Check if two Uint8Arrays are equal
@@ -43,14 +43,14 @@ const sleep = async (ms: number) => {
 //  * @returns True or false
 //  */
 // function arraysEqual(a: Uint8Array, b: Uint8Array) {
-//     if (a === b) return true;
-//     if (a == null || b == null) return false;
-//     if (a.length !== b.length) return false;
+//     if (a === b) return true
+//     if (a == null || b == null) return false
+//     if (a.length !== b.length) return false
 
 //     for (var i = 0; i < a.length; ++i) {
-//       if (a[i] !== b[i]) return false;
+//       if (a[i] !== b[i]) return false
 //     }
-//     return true;
+//     return true
 //   }
 
 class EosOracle{
@@ -105,9 +105,9 @@ class EosOracle{
             }, {
                 blocksBehind: 3,
                 expireSeconds: 30,
-            });
+            })
         } catch (e) {
-            console.error(`\nCaught exception: ${e} \n`);
+            console.error(`\nCaught exception: ${e} \n`)
             let retry = true
             if (e instanceof RpcError){
                 if('code' in e.json){
@@ -154,7 +154,7 @@ class EosOracle{
                     table: 'teleports',
                     lower_bound,
                     limit
-                });
+                })
             } catch(e){
                 console.log(e)
                 await this.eos_api.nextEndpoint()
@@ -166,12 +166,12 @@ class EosOracle{
             }
         } while(!gotTeleport)
         
-        return teleport_res as GetTableRowsResult;
+        return teleport_res as GetTableRowsResult
     }
     
     // async function validateEntryByOtherEndpoints(id: number, logdata: Uint8Array, dataSize: number){
     //     if(config.eos.epVerifications > eos_api.get_EndpointAmount()){
-    //         console.error('Not enough endpoints to verify data');
+    //         console.error('Not enough endpoints to verify data')
     //         process.exit(1)
     //     }
     //     const lastEndpoint = eos_api.getEndpoint()
@@ -185,7 +185,7 @@ class EosOracle{
     //         if(!arraysEqual(logdata, veriData)){
     //             throw('Verification failed by' + eos_api.getEndpoint())
     //         }
-    //         console.log(`Teleport id ${id} verified ${i + 1} times`);
+    //         console.log(`Teleport id ${id} verified ${i + 1} times`)
     //     }
     // }
                 
@@ -200,7 +200,7 @@ class EosOracle{
         const sb = new Serialize.SerialBuffer({
             textEncoder: new TextEncoder,
             textDecoder: new TextDecoder
-        });
+        })
         sb.pushNumberAsUint64(teleport.id) // TODO: use bigint
         sb.pushUint32(teleport.time)
         sb.pushName(teleport.account)
@@ -219,8 +219,8 @@ class EosOracle{
         // Sha3 of the serilized values. Note: The same result is one parameter for the claim function on the eth chain
         const logDataKeccak = keccak(Buffer.from(logData))
         
-        // console.log('logData', Buffer.from(logData).toString('hex'));
-        // console.log('logDataKeccak', logDataKeccak.toString('hex'));
+        // console.log('logData', Buffer.from(logData).toString('hex'))
+        // console.log('logDataKeccak', logDataKeccak.toString('hex'))
         
         // Sign the sha3 hash
         const ethPriKey = Buffer.from(privateKey, "hex")
@@ -311,7 +311,7 @@ class EosOracle{
                 }
                 verifications++
             } catch(e) {
-                console.log('⚡️ ' + e);
+                console.log('⚡️ ' + e)
                 // Get next endpoint and check if all endpoints are already checked
                 this.eos_api.nextEndpoint()
                 if(epStart == this.eos_api.getEndpoint()){
@@ -373,14 +373,14 @@ class EosOracle{
                     console.error(`Verification failed by ${this.eos_api.getEndpoint()}. ⚠️`)
                     isVerifyed = false
                 }
-                // console.log(`Teleport id ${item.id}, verified ${i + 1} times`);
+                // console.log(`Teleport id ${item.id}, verified ${i + 1} times`)
             }
 
             // Check time
             if(item.time > this.irreversible_time){
                 waitForIrr = item.time - this.irreversible_time
                 lastHandledId = item.id
-                break;
+                break
             }
 
             if(!isVerifyed){
@@ -449,7 +449,7 @@ class EosOracle{
                 await EosOracle.WaitWithAnimation(EosOracle.maxWait, 'All available teleports signed')
             }
         } catch (e){
-            console.error('⚡️ ' + e);
+            console.error('⚡️ ' + e)
         }
         console.log('Thread closed 💀')
     }
@@ -483,7 +483,7 @@ const argv = yargs
         amount: number,
         signs: number,
         config: string
-    };
+    }
 
 // Load config and set title
 const config_path = argv.config || process.env['CONFIG'] || './config'
@@ -495,4 +495,4 @@ const signatureProvider = new JsSignatureProvider([configFile.eos.privateKey])
 const eosOracle = new EosOracle(configFile, signatureProvider)
 
 // Run the process
-eosOracle.run(argv.id, argv.amount);
+eosOracle.run(argv.id, argv.amount)

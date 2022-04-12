@@ -50,9 +50,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EosApi = void 0;
+exports.EthApi = exports.EosApi = void 0;
 var eosjs_1 = require("eosjs");
 var cross_fetch_1 = __importDefault(require("cross-fetch"));
+var ethers_1 = require("ethers");
 var EosApi = /** @class */ (function () {
     function EosApi(chainId, endpointList, signatureProvider, timeout) {
         if (timeout === void 0) { timeout = 10000; }
@@ -67,7 +68,7 @@ var EosApi = /** @class */ (function () {
         this.lastInfo = null;
         this.gotRightInfo = [];
         if (endpointList.length <= 0) {
-            throw ('No list of entpoints defined');
+            throw ('No list of eosio entpoints defined');
         }
         this.gotRightInfo = Array(endpointList.length).fill(false);
         this.endpointList = endpointList.map(function (ep) {
@@ -101,6 +102,10 @@ var EosApi = /** @class */ (function () {
                             this.gotRightInfo[this.epId] = true;
                             // console.log('Use new endpoint', this.endpoint);
                             return [2 /*return*/];
+                        }
+                        else {
+                            i--;
+                            return [3 /*break*/, 4];
                         }
                         return [3 /*break*/, 4];
                     case 3: 
@@ -175,3 +180,113 @@ var EosApi = /** @class */ (function () {
     return EosApi;
 }());
 exports.EosApi = EosApi;
+var EthApi = /** @class */ (function () {
+    function EthApi(chainId, endpointList, timeout) {
+        if (timeout === void 0) { timeout = 10000; }
+        this.chainId = chainId;
+        this.timeout = timeout;
+        this.epId = -1;
+        this.providers = [];
+        this.endpointList = [];
+        this.endpoint = this.endpointList[0];
+        this.lastInfo = null;
+        this.gotRightInfo = [];
+        if (endpointList.length <= 0) {
+            throw ('No list of eth entpoints defined');
+        }
+        this.gotRightInfo = Array(endpointList.length).fill(false);
+        this.endpointList = endpointList.map(function (ep) {
+            var lastIndex = ep.length - 1;
+            return ep[lastIndex] == '/' ? ep.substring(0, lastIndex) : ep;
+        });
+    }
+    EthApi.prototype.getEndpoint = function () {
+        return this.endpoint;
+    };
+    EthApi.prototype.getProvider = function () {
+        return this.providers[this.epId];
+    };
+    EthApi.prototype.checkInfo = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _a, e_1;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        _b.trys.push([0, 2, , 3]);
+                        _a = this;
+                        return [4 /*yield*/, this.providers[this.epId].getNetwork()];
+                    case 1:
+                        _a.lastInfo = _b.sent();
+                        if (this.lastInfo.chainId != this.chainId) {
+                            console.log('Delete endpoint because it uses another eosio chain', this.endpoint);
+                            this.endpointList.splice(this.epId, 1);
+                            this.gotRightInfo.splice(this.epId, 1);
+                            this.providers.splice(this.epId, 1);
+                            this.epId--;
+                            return [2 /*return*/, false];
+                        }
+                        return [3 /*break*/, 3];
+                    case 2:
+                        e_1 = _b.sent();
+                        console.log('Can not connect to endpoint');
+                        return [2 /*return*/, false];
+                    case 3: return [2 /*return*/, true];
+                }
+            });
+        });
+    };
+    /**
+     * Set the next endpoint for RPC and API
+     */
+    EthApi.prototype.nextEndpoint = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var i;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        i = 0;
+                        _a.label = 1;
+                    case 1:
+                        if (!(i < this.endpointList.length)) return [3 /*break*/, 5];
+                        // set next endpoint url
+                        this.epId++;
+                        if (this.epId >= this.endpointList.length) {
+                            this.epId = 0;
+                        }
+                        this.endpoint = this.endpointList[this.epId];
+                        // Create new provider if it is undefined
+                        if (!this.providers[this.epId]) {
+                            this.providers[this.epId] = new ethers_1.ethers.providers.StaticJsonRpcProvider(this.endpoint);
+                        }
+                        if (!!this.gotRightInfo[this.epId]) return [3 /*break*/, 3];
+                        return [4 /*yield*/, this.checkInfo()];
+                    case 2:
+                        if (_a.sent()) {
+                            this.gotRightInfo[this.epId] = true;
+                            return [2 /*return*/];
+                        }
+                        else {
+                            i--;
+                            return [3 /*break*/, 4];
+                        }
+                        return [3 /*break*/, 4];
+                    case 3:
+                        console.log('Use next endpoint', this.endpoint); //-
+                        return [2 /*return*/];
+                    case 4:
+                        i++;
+                        return [3 /*break*/, 1];
+                    case 5: throw ('No usable endpoints.');
+                }
+            });
+        });
+    };
+    EthApi.prototype.get_lastInfo = function () {
+        return this.lastInfo;
+    };
+    EthApi.prototype.get_EndpointAmount = function () {
+        return this.endpointList.length;
+    };
+    return EthApi;
+}());
+exports.EthApi = EthApi;

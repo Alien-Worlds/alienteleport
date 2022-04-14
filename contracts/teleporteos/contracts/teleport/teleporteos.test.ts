@@ -37,6 +37,11 @@ describe('teleporteos', async () => {
   before(async () => {
     await seedAccounts();
   });
+  context('initialize contract', async () => {
+    it('should succeed', async () => {
+      await teleporteos.ini('100.0000 TLM', 0, '0', false, { from: teleporteos.account });
+    });
+  });
   context('regoracle', async () => {
     context('without correct auth', async () => {
       it('should fail with auth error', async () => {
@@ -402,7 +407,7 @@ describe('teleporteos', async () => {
             teleporteos.teleport(sender1.name, '23.0000 TLM', 2, ethToken, {
               from: sender1,
             }),
-            'Transfer is below minimum of 100 TLM'
+            'Transfer is below minimum token amount'
           );
         });
       });

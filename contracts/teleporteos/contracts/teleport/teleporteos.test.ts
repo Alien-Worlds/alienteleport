@@ -39,8 +39,36 @@ describe('teleporteos', async () => {
     await seedAccounts();
   });
   context('initialize contract', async () => {
-    it('should succeed', async () => {
-      await teleporteos.ini(`100.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, { from: teleporteos.account });
+    context('without correct auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.ini(`100.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, { from: sender1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      it('should succeed', async () => {
+        await teleporteos.ini(`100.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, { from: teleporteos.account });
+      });
+
+      it('execute again should fail', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.ini(`50.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, { from: teleporteos.account }),
+          'Already initialized'
+        );
+      });
+      it('should update stats table', async () => {
+        let { rows: [item] } = await teleporteos.statsTable();
+        chai.expect(item.collected).equal(0, 'Wrong collected');
+        chai.expect(item.fin).equal(false, 'Wrong freeze in');
+        chai.expect(item.fout).equal(false, 'Wrong freeze out');
+        chai.expect(item.fcancel).equal(false, 'Wrong freeze cancel');
+        chai.expect(item.foracles).equal(false, 'Wrong freeze oracles');
+        chai.expect(item.oracles).equal(0, 'Wrong oracle amount');
+        chai.expect(item.min).equal(1000000, 'Wrong minimum transfer amount');
+        chai.expect(item.fixfee).equal(0, 'Wrong fix fee');
+        chai.expect(item.varfee).equal('0.00000000000000000', 'Wrong variable fee');
+      });
     });
   });
   context('regoracle', async () => {
@@ -456,15 +484,11 @@ describe('teleporteos', async () => {
             `123.0000 ${token_symbol}`,
             2,
             ethToken,
-            {
-              from: sender1,
-            }
+            { from: sender1 }
           );
         });
         it('should update table', async () => {
-          let {
-            rows: [item],
-          } = await teleporteos.teleportsTable();
+          let { rows: [item] } = await teleporteos.teleportsTable();
           chai.expect(item.account).equal(sender1.name);
           chai.expect(item.chain_id).equal(2);
           chai.expect(item.id).equal(0);
@@ -475,6 +499,143 @@ describe('teleporteos', async () => {
           chai.expect(item.claimed).false;
         });
       });
+    });
+  });
+
+  context('adjust minimum amount', async () => {
+    context('with incorrect auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.setmin(`200.0000 ${token_symbol}`, { from: sender1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      it('wrong symbol name should fail', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.setmin(`200.0000 ${token_symbol.length <= 3? token_symbol + 'A': 'AAA'}`, { from: teleporteos.account }),
+          'Wrong token'
+        );
+      });
+        it('wrong symbol precision should fail', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.setmin(`200 ${token_symbol}`, { from: teleporteos.account }),
+          'Wrong token'
+        );
+      });
+      it('should succeed', async () => {
+        await teleporteos.setmin(`200.0000 ${token_symbol}`, { from: teleporteos.account })
+      });
+      it('should update threshold', async () => {
+        let { rows: [item] } = await teleporteos.statsTable();
+        chai.expect(item.min).equal(2000000);
+      });
+    });
+  });
+  
+  context('adjust fee', async () => {
+    context('with incorrect auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.setfee(`0.1000 ${token_symbol}`, '0.003', { from: sender1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      context('with wrong variable fee', async () => {
+        it('should fail', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.setfee(`0.0000 ${token_symbol}`, '-0.01', { from: teleporteos.account }),
+            'Variable fee has to be between 0 and 0.20'
+          );
+        });
+        it('should fail', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.setfee(`0.0000 ${token_symbol}`, '1', { from: teleporteos.account }),
+            'Variable fee has to be between 0 and 0.20'
+          );
+        });     
+      });
+      context('with wrong fix fee', async () => {
+        it('wrong symbol name should fail', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.setfee(`0.0001 ${token_symbol.length <= 3? token_symbol + 'A': 'AAA'}`, '0', { from: teleporteos.account }),
+            'Wrong token'
+          );
+        });
+        it('wrong symbol precision should fail', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.setfee(`1 ${token_symbol}`, '0.003', { from: teleporteos.account }),
+            'Wrong token'
+          );
+        });
+        it('too high amount should fail', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.setfee(`200.0000 ${token_symbol}`, '0.003', { from: teleporteos.account }),
+            'Fees are too high relative to the minimum amount of token transfers'
+          );
+        });  
+      });
+      it('should succeed', async () => {
+        await teleporteos.setfee(`0.1000 ${token_symbol}`, '0.003', { from: teleporteos.account });
+      });
+    });
+    // TODO: Check stats table
+    // TODO: Withdraw and Deposit with no fees
+    // TODO: Teleport, fee reduces the  
+  });
+  
+  context('adjust threshold', async () => {
+    context('with incorrect auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.setthreshold(2, { from: sender1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      context('incorrect amount', async () => {
+        it('should fail', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.setthreshold(0, { from: teleporteos.account }),
+            'Needed confirmation amount has to be grater than 0'
+          );
+        });
+      });
+    // TODO: Add new receipts 
+    // TODO: Check if it is not confirmed
+    // TODO: Confirm one more time
+    // TODO: Check if it is confirmed now
+    // TODO: Check if further confirmation fails
+    });
+  });
+  
+  context('delete teleports', async () => {
+    context('with incorrect auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.delteles('0', { from: sender1 })
+        );
+      });
+    });
+    
+    context('with not available id', async () => {
+      it('should fail', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.delteles('1', { from: teleporteos.account }), 
+          'Teleport id not found'
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      // TODO: Add three teleports
+      // TODO: Delete until a speific one
+      // TODO: Specific one should still be there and all below deleted
+      // TODO: Should fail to sign a deleted teleport
+      // TODO: Should add a new teleport in the front
+      // TODO: Should fail to sign a old 
+      // TODO: Delete until last id
+      // TODO: Last if should still be there and all below deleted
     });
   });
 });

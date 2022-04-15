@@ -151,8 +151,7 @@ public:
   ACTION teleport(name from, asset quantity, uint8_t chain_id, checksum256 eth_address);
   ACTION logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity, uint8_t chain_id, checksum256 eth_address);
   ACTION sign(name oracle_name, uint64_t id, string signature);
-  ACTION repairrec(uint64_t id, asset quantity, vector<name> approvers,
-                   bool completed);
+  ACTION repairrec(uint64_t id, asset quantity, vector<name> approvers, bool completed);
   ACTION withdraw(name from, asset quantity);
   /**
    * @brief Cancel a teleport which is not claimed yet and 32 days old. Consider, you will not get back payed fees 
@@ -165,7 +164,21 @@ public:
   ACTION regoracle(name oracle_name);
   ACTION unregoracle(name oracle_name);
   ACTION sign(string signature);
-  ACTION delreceipts();
+
+  /**
+   * @brief Delete all receipt entries until a specific date
+   * Note: Oracles have to ignore old receipts to avoid double spending
+   * 
+   * @param to_date 
+   */
+  ACTION delreceipts(time_point_sec to_date);
+
+  /**
+   * @brief Delete claimed and canceled teleports in teleport and cancel table
+   * Note: The last entry cannot be deleted, so the deletion causes no further risk of double spending
+   * 
+   * @param to_id Delete all entries until this id.
+   */
   ACTION delteles(uint64_t to_id);
 
   /**

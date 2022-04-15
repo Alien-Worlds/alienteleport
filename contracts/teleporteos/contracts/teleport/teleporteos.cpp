@@ -18,6 +18,7 @@ ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee
   check(fixfee.symbol == TOKEN_SYMBOL, "Wrong token symbol of fee");
   check(threshold > 0, "Needed confirmation amount has to be grater than 0");
   check(varfee <= 0.2 && varfee >= 0, "Variable fee has to be between 0 and 0.20");
+  check(_stats.find(TOKEN_SYMBOL.raw()) == _stats.end(), "Already initialized");
 
   auto stat = _stats.emplace(get_self(), [&](auto &s) {
     s.symbol = TOKEN_SYMBOL;
@@ -296,12 +297,16 @@ ACTION teleporteos::unregoracle(name oracle_name) {
   });
 }
 
-ACTION teleporteos::delreceipts() {
+ACTION teleporteos::delreceipts(time_point_sec to_date) {
   require_auth(get_self());
 
   auto receipt = _receipts.begin();
   while (receipt != _receipts.end()) {
-    receipt = _receipts.erase(receipt);
+    if(receipt->date < to_date){
+      receipt = _receipts.erase(receipt);
+    } else {
+      receipt++;
+    }
   }
 }
 
@@ -317,7 +322,7 @@ ACTION teleporteos::delteles(uint64_t to_id) {
     if(tp != _teleports.end()){
       _teleports.erase(tp);
     }
-     ci = _cancels.erase(ci);
+    ci = _cancels.erase(ci);
   }
 
   // Delete all remaining teleports which are claimed and id is less than to_id  
@@ -325,6 +330,8 @@ ACTION teleporteos::delteles(uint64_t to_id) {
   while (tp != del_to) {
     if(tp->claimed){
       tp = _teleports.erase(tp);
+    } else {
+      tp++;
     }
   }
 }
@@ -417,7 +424,7 @@ void teleporteos::addDeposit(const name from, const asset quantity){
 }
 
 void teleporteos::paymentsToOracles(stats_table::const_iterator stat){
-  check(stat->oracles <= 0, "There are no oracles");
+  check(stat->oracles > 0, "There are no oracles");
   uint64_t quantity = stat->collected / stat->oracles;
   check(quantity == 0, "Pay off amount is too low");
   for (auto itr = _oracles.cbegin(); itr != _oracles.cend(); itr++) {

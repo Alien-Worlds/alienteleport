@@ -29,7 +29,8 @@ ACTION freeze(const bool in, const bool out, const bool oracles, const bool canc
 
 ## Upgrade from running teleport contract of alien world
 
-Just deploy the contract over the old teleport contract account and run the ini action. (In this upgrade the old table structures are not changed. There are only new tables)
+Just deploy the contract over the old teleport contract account and run the ini action.
+Note: In this upgrade are additional tables, the structure of the old tables is not changed.
 
 # Install test suite on windows
 

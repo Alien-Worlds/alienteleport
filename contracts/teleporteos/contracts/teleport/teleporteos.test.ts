@@ -20,8 +20,9 @@ import { Teleporteos } from './teleporteos';
 import { EosioToken } from '../eosio.token/eosio.token';
 import { assert } from 'console';
 
-const ethToken =
-  '2222222222222222222222222222222222222222222222222222222222222222';
+const ethToken = '2222222222222222222222222222222222222222222222222222222222222222';
+
+const token_symbol = 'TLM';
 
 let teleporteos: Teleporteos;
 let alienworldsToken: EosioToken;
@@ -39,7 +40,7 @@ describe('teleporteos', async () => {
   });
   context('initialize contract', async () => {
     it('should succeed', async () => {
-      await teleporteos.ini('100.0000 TLM', 0, '0', false, { from: teleporteos.account });
+      await teleporteos.ini(`100.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, { from: teleporteos.account });
     });
   });
   context('regoracle', async () => {
@@ -112,7 +113,7 @@ describe('teleporteos', async () => {
             sender1.name,
             sender1.name,
             '1111111111111111111111111111111111111111111111111111111111111111',
-            '123.0000 TLM',
+            `123.0000 ${token_symbol}`,
             2,
             true,
             {
@@ -131,7 +132,7 @@ describe('teleporteos', async () => {
               oracle3.name,
               sender1.name,
               '1111111111111111111111111111111111111111111111111111111111111111',
-              '123.0000 TLM',
+              `123.0000 ${token_symbol}`,
               2,
               true,
               {
@@ -147,7 +148,7 @@ describe('teleporteos', async () => {
             oracle3.name,
             sender1.name,
             '1111111111111111111111111111111111111111111111111111111111111111',
-            '123.0000 TLM',
+            `123.0000 ${token_symbol}`,
             2,
             true,
             {
@@ -164,7 +165,7 @@ describe('teleporteos', async () => {
               confirmations: 1,
               date: new Date(),
               id: 0,
-              quantity: '123.0000 TLM',
+              quantity: `123.0000 ${token_symbol}`,
               ref: '1111111111111111111111111111111111111111111111111111111111111111',
               to: sender1.name,
             },
@@ -178,7 +179,7 @@ describe('teleporteos', async () => {
           oracle1.name,
           sender1.name,
           '1111111111111111111111111111111111111111111111111111111111111111',
-          '123.0000 TLM',
+          `123.0000 ${token_symbol}`,
           2,
           true,
           {
@@ -194,7 +195,7 @@ describe('teleporteos', async () => {
             oracle3.name,
             sender1.name,
             '1111111111111111111111111111111111111111111111111111111111111111',
-            '0.1230 TLM',
+            `0.1230 ${token_symbol}`,
             2,
             true,
             {
@@ -212,7 +213,7 @@ describe('teleporteos', async () => {
             oracle3.name,
             sender2.name,
             '1111111111111111111111111111111111111111111111111111111111111111',
-            '123.0000 TLM',
+            `123.0000 ${token_symbol}`,
             2,
             true,
             {
@@ -230,7 +231,7 @@ describe('teleporteos', async () => {
             oracle3.name,
             sender1.name,
             '1111111111111111111111111111111111111111111111111111111111111111',
-            '123.0000 TLM',
+            `123.0000 ${token_symbol}`,
             2,
             true,
             {
@@ -247,7 +248,7 @@ describe('teleporteos', async () => {
           oracle2.name,
           sender1.name,
           '1111111111111111111111111111111111111111111111111111111111111111',
-          '123.0000 TLM',
+          `123.0000 ${token_symbol}`,
           2,
           true,
           {
@@ -260,7 +261,7 @@ describe('teleporteos', async () => {
           alienworldsToken.accountsTable({ scope: sender1.name }),
           [
             {
-              balance: '1000123.0000 TLM',
+              balance: `1000123.0000 ${token_symbol}`,
             },
           ]
         );
@@ -274,7 +275,7 @@ describe('teleporteos', async () => {
             confirmations: 3,
             date: new Date(),
             id: 0,
-            quantity: '123.0000 TLM',
+            quantity: `123.0000 ${token_symbol}`,
             ref: '1111111111111111111111111111111111111111111111111111111111111111',
             to: sender1.name,
           },
@@ -288,7 +289,7 @@ describe('teleporteos', async () => {
         oracle1.name,
         sender1.name,
         '1111111111111111111111111111111111111111111111111111111111111112',
-        '0.1230 TLM',
+        `0.1230 ${token_symbol}`,
         2,
         true,
         {
@@ -299,7 +300,7 @@ describe('teleporteos', async () => {
     context('with wrong auth', async () => {
       it('should fail', async () => {
         await assertMissingAuthority(
-          teleporteos.repairrec(1, '123.0000 TLM', [oracle1.name], true, {
+          teleporteos.repairrec(1, `123.0000 ${token_symbol}`, [oracle1.name], true, {
             from: sender1,
           })
         );
@@ -309,7 +310,7 @@ describe('teleporteos', async () => {
       context('with non-existing receipt', async () => {
         it('should fail', async () => {
           await assertEOSErrorIncludesMessage(
-            teleporteos.repairrec(4, '123.0000 TLM', [oracle1.name], true, {
+            teleporteos.repairrec(4, `123.0000 ${token_symbol}`, [oracle1.name], true, {
               from: teleporteos.account,
             }),
             'Receipt does not exist.'
@@ -331,7 +332,7 @@ describe('teleporteos', async () => {
       context('with negative quantity', async () => {
         it('should fail', async () => {
           await assertEOSErrorIncludesMessage(
-            teleporteos.repairrec(1, '-123.0000 TLM', [oracle1.name], true, {
+            teleporteos.repairrec(1, `-123.0000 ${token_symbol}`, [oracle1.name], true, {
               from: teleporteos.account,
             }),
             'Quantity cannot be negative'
@@ -342,7 +343,7 @@ describe('teleporteos', async () => {
         it('should succeed', async () => {
           await teleporteos.repairrec(
             1,
-            '124.0000 TLM',
+            `124.0000 ${token_symbol}`,
             [oracle1.name],
             false,
             {
@@ -359,7 +360,7 @@ describe('teleporteos', async () => {
               confirmations: 3,
               date: new Date(),
               id: 0,
-              quantity: '123.0000 TLM',
+              quantity: `123.0000 ${token_symbol}`,
               ref: '1111111111111111111111111111111111111111111111111111111111111111',
               to: sender1.name,
             },
@@ -370,7 +371,7 @@ describe('teleporteos', async () => {
               confirmations: 1,
               date: new Date(),
               id: 1,
-              quantity: '124.0000 TLM',
+              quantity: `124.0000 ${token_symbol}`,
               ref: '1111111111111111111111111111111111111111111111111111111111111112',
               to: sender1.name,
             },
@@ -383,10 +384,9 @@ describe('teleporteos', async () => {
     context('without valid auth', async () => {
       it('should fail with auth error', async () => {
         await assertMissingAuthority(
-          teleporteos.teleport(sender1.name, '123.0000 TLM', 2, ethToken, {
+          teleporteos.teleport(sender1.name, `123.0000 ${token_symbol}`, 2, ethToken, {
             from: sender2,
-          }),
-          ''
+          })
         );
       });
     });
@@ -404,7 +404,7 @@ describe('teleporteos', async () => {
       context('with amount below minimum', async () => {
         it('should fail with below min error error', async () => {
           await assertEOSErrorIncludesMessage(
-            teleporteos.teleport(sender1.name, '23.0000 TLM', 2, ethToken, {
+            teleporteos.teleport(sender1.name, `23.0000 ${token_symbol}`, 2, ethToken, {
               from: sender1,
             }),
             'Transfer is below minimum token amount'
@@ -414,7 +414,7 @@ describe('teleporteos', async () => {
       context('with no available deposit', async () => {
         it('should fail with no deposit error', async () => {
           await assertEOSErrorIncludesMessage(
-            teleporteos.teleport(sender1.name, '123.0000 TLM', 2, ethToken, {
+            teleporteos.teleport(sender1.name, `123.0000 ${token_symbol}`, 2, ethToken, {
               from: sender1,
             }),
             'Deposit not found'
@@ -426,14 +426,14 @@ describe('teleporteos', async () => {
           await alienworldsToken.transfer(
             sender1.name,
             teleporteos.account.name,
-            '120.0000 TLM',
+            `120.0000 ${token_symbol}`,
             'teleport test',
             { from: sender1 }
           );
         });
         it('should fail with not enough deposit error', async () => {
           await assertEOSErrorIncludesMessage(
-            teleporteos.teleport(sender1.name, '123.0000 TLM', 2, ethToken, {
+            teleporteos.teleport(sender1.name, `123.0000 ${token_symbol}`, 2, ethToken, {
               from: sender1,
             }),
             'Not enough deposited'
@@ -445,7 +445,7 @@ describe('teleporteos', async () => {
           await alienworldsToken.transfer(
             sender1.name,
             teleporteos.account.name,
-            '104.0000 TLM',
+            `104.0000 ${token_symbol}`,
             'teleport test extra amount',
             { from: sender1 }
           );
@@ -453,7 +453,7 @@ describe('teleporteos', async () => {
         it('should succeed', async () => {
           await teleporteos.teleport(
             sender1.name,
-            '123.0000 TLM',
+            `123.0000 ${token_symbol}`,
             2,
             ethToken,
             {
@@ -468,7 +468,7 @@ describe('teleporteos', async () => {
           chai.expect(item.account).equal(sender1.name);
           chai.expect(item.chain_id).equal(2);
           chai.expect(item.id).equal(0);
-          chai.expect(item.quantity).equal('123.0000 TLM');
+          chai.expect(item.quantity).equal(`123.0000 ${token_symbol}`);
           chai.expect(item.eth_address).equal(ethToken);
           chai.expect(item.oracles).empty;
           chai.expect(item.signatures).empty;
@@ -535,7 +535,7 @@ async function issueTokens() {
   try {
     await alienworldsToken.create(
       alienworldsToken.account.name,
-      '1000000000.0000 TLM',
+      `1000000000.0000 ${token_symbol}`,
       {
         from: alienworldsToken.account,
       }
@@ -543,14 +543,14 @@ async function issueTokens() {
 
     await alienworldsToken.issue(
       alienworldsToken.account.name,
-      '10000000.0000 TLM',
+      `10000000.0000 ${token_symbol}`,
       'initial deposit',
       {
         from: alienworldsToken.account,
       }
     );
   } catch (e) {
-    if (e.json.error.what != 'eosio_assert_message assertion failure') {
+    if ((e as { json: {error: {what: string } } }).json.error.what != 'eosio_assert_message assertion failure') {
       throw e;
     }
   }
@@ -558,7 +558,7 @@ async function issueTokens() {
   await alienworldsToken.transfer(
     alienworldsToken.account.name,
     sender1.name,
-    '1000000.0000 TLM',
+    `1000000.0000 ${token_symbol}`,
     'inital balance',
     { from: alienworldsToken.account }
   );
@@ -566,7 +566,7 @@ async function issueTokens() {
   await alienworldsToken.transfer(
     alienworldsToken.account.name,
     teleporteos.account.name,
-    '1000000.0000 TLM',
+    `1000000.0000 ${token_symbol}`,
     'inital balance',
     { from: alienworldsToken.account }
   );

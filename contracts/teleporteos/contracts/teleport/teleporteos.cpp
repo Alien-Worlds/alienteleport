@@ -11,9 +11,15 @@ teleporteos::teleporteos(name s, name code, datastream<const char *> ds)
     _teleports(get_self(), get_self().value),
     _cancels(get_self(), get_self().value) {}
 
-ACTION teleporteos::ini(const asset min, const uint64_t fixfee, const double varfee, const bool freeze){
+ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee, const bool freeze, const uint32_t threshold){
   require_auth(get_self());
-  _stats.emplace(get_self(), [&](auto &s) {
+
+  check(min.symbol == TOKEN_SYMBOL, "Wrong token symbol of min amount");
+  check(fixfee.symbol == TOKEN_SYMBOL, "Wrong token symbol of fee");
+  check(threshold > 0, "Needed confirmation amount has to be grater than 0");
+  check(varfee <= 0.2 && varfee >= 0, "Variable fee has to be between 0 and 0.20");
+
+  auto stat = _stats.emplace(get_self(), [&](auto &s) {
     s.symbol = TOKEN_SYMBOL;
     s.min = min.amount;
     s.fixfee = 0;
@@ -24,7 +30,11 @@ ACTION teleporteos::ini(const asset min, const uint64_t fixfee, const double var
     s.foracles = freeze;
     s.fcancel = freeze;
     s.oracles = 0;
+    s.threshold = threshold;
   });
+
+  uint64_t fee = calc_fee(stat, min.amount);
+  check(fee < min.amount, "Fees are too high relative to the minimum amount of token transfers");
 }
 
 /* Notifications for token transfer */
@@ -198,7 +208,7 @@ ACTION teleporteos::received(name oracle_name, name to, checksum256 ref, asset q
       bool completed = false;
 
 
-      if (receipt->confirmations >= ORACLE_CONFIRMATIONS - 1) { // check for one less because of this confirmation
+      if (receipt->confirmations >= stat->threshold - 1) { // check for one less because of this confirmation
         // Pay fee
         uint64_t fee = calc_fee(stat, quantity.amount);
         _stats.modify(*stat, get_self(), [&](auto &s) {
@@ -295,12 +305,27 @@ ACTION teleporteos::delreceipts() {
   }
 }
 
-ACTION teleporteos::delteles() {
+ACTION teleporteos::delteles(uint64_t to_id) {
   require_auth(get_self());
+  auto del_to = _teleports.find(to_id);
+  check(del_to != _teleports.end(), "Teleport id not found");
 
+  // Delete all cancels and regarding teleports which id is less than to_id
+  auto ci = _cancels.begin();
+  while (ci != _cancels.end() && ci->teleport_id < to_id) {
+    auto tp = _teleports.find(ci->teleport_id);
+    if(tp != _teleports.end()){
+      _teleports.erase(tp);
+    }
+     ci = _cancels.erase(ci);
+  }
+
+  // Delete all remaining teleports which are claimed and id is less than to_id  
   auto tp = _teleports.begin();
-  while (tp != _teleports.end()) {
-    tp = _teleports.erase(tp);
+  while (tp != del_to) {
+    if(tp->claimed){
+      tp = _teleports.erase(tp);
+    }
   }
 }
 
@@ -315,7 +340,7 @@ ACTION teleporteos::freeze(const bool in, const bool out, const bool oracles, co
   });
 }
 
-ACTION teleporteos::changemin(const asset min){
+ACTION teleporteos::setmin(const asset min){
   require_auth(get_self());
   
   check(min.symbol == TOKEN_SYMBOL, "Wrong token");
@@ -329,13 +354,13 @@ ACTION teleporteos::changemin(const asset min){
   });
 }
 
-ACTION teleporteos::changefee(const asset fixfee, const double varfee){
+ACTION teleporteos::setfee(const asset fixfee, const double varfee){
   require_auth(get_self());
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
   check(fixfee.symbol == TOKEN_SYMBOL, "Wrong token");
   check(varfee <= 0.2 && varfee >= 0, "Variable fee has to be between 0 and 0.20");
 
-  payOffOracles(stat);
+  paymentsToOracles(stat);
 
   _stats.modify(*stat, same_payer, [&](auto &s) { 
     s.fixfee = fixfee.amount;
@@ -347,9 +372,21 @@ ACTION teleporteos::changefee(const asset fixfee, const double varfee){
   check(fee < stat->min, "Fees are too high relative to the minimum amount of token transfers");
 }
 
+ACTION teleporteos::setthreshold(const uint32_t threshold){
+  require_auth(get_self());
+  check(threshold > 0, "Needed confirmation amount has to be grater than 0");
+  auto stat = _stats.find(TOKEN_SYMBOL.raw());
+  _stats.modify(*stat, same_payer, [&](auto &s) { 
+    s.threshold = threshold;
+  });
+}
+
 ACTION teleporteos::payoracles(){
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
-  payOffOracles(stat);
+  paymentsToOracles(stat);
+  _stats.modify(*stat, same_payer, [&](auto &s) { 
+    s.collected = 0;
+  });
 }
 
 /* Private */
@@ -379,7 +416,7 @@ void teleporteos::addDeposit(const name from, const asset quantity){
   }
 }
 
-void teleporteos::payOffOracles(stats_table::const_iterator stat){
+void teleporteos::paymentsToOracles(stats_table::const_iterator stat){
   check(stat->oracles <= 0, "There are no oracles");
   uint64_t quantity = stat->collected / stat->oracles;
   check(quantity == 0, "Pay off amount is too low");

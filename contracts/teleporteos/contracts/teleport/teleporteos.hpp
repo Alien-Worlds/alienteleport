@@ -6,7 +6,6 @@
 using namespace eosio;
 using namespace std;
 
-#define ORACLE_CONFIRMATIONS 3
 #define TOKEN_CONTRACT_STR "alien.worlds"
 #define TOKEN_CONTRACT name(TOKEN_CONTRACT_STR)
 #define TOKEN_SYMBOL symbol("TLM", 4)
@@ -22,6 +21,7 @@ private:
     double varfee;          // Variable fee for teleports and receipts
     uint64_t collected;     // Collected fees which are not payed off yet
     uint32_t oracles;       // Amount of oracles
+    uint32_t threshold;     // Amount of oracle confirmations which are needed to confirm a received teleport 
     bool fin;               // Freeze incoming funds
     bool fout;              // Freeze outgoing funds
     bool foracles;          // Freeze oracles
@@ -125,10 +125,10 @@ private:
   void addDeposit(const name from, const asset quantity);
 
   /**
-   * @brief Pay off all oracles
+   * @brief Send payments to all oracles
    * @param stat 
    */
-  void payOffOracles(stats_table::const_iterator stat);
+  void paymentsToOracles(stats_table::const_iterator stat);
 
 public:
   using contract::contract;
@@ -143,16 +143,13 @@ public:
    * @param varfee Variable fee for teleports and receipts
    * @param freeze Freeze all freezable actions
    */
-  ACTION ini(const asset min, const uint64_t fixfee, const double varfee, const bool freeze);
+  ACTION ini(const asset min, const asset fixfee, const double varfee, const bool freeze, const uint32_t threshold);
 
   /* Fungible token transfer (only trilium) */
-  [[eosio::on_notify(TOKEN_CONTRACT_STR "::transfer")]] void transfer(
-      name from, name to, asset quantity, string memo);
+  [[eosio::on_notify(TOKEN_CONTRACT_STR "::transfer")]] void transfer(name from, name to, asset quantity, string memo);
 
-  ACTION teleport(name from, asset quantity, uint8_t chain_id,
-                  checksum256 eth_address);
-  ACTION logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity,
-                     uint8_t chain_id, checksum256 eth_address);
+  ACTION teleport(name from, asset quantity, uint8_t chain_id, checksum256 eth_address);
+  ACTION logteleport(uint64_t id, uint32_t timestamp, name from, asset quantity, uint8_t chain_id, checksum256 eth_address);
   ACTION sign(name oracle_name, uint64_t id, string signature);
   ACTION repairrec(uint64_t id, asset quantity, vector<name> approvers,
                    bool completed);
@@ -163,15 +160,13 @@ public:
    * @param id Teleport id
    */
   ACTION cancel(uint64_t id);
-  ACTION received(name oracle_name, name to, checksum256 ref, asset quantity,
-                  uint8_t chain_id, bool confirmed);
-  ACTION claimed(name oracle_name, uint64_t id, checksum256 to_eth,
-                 asset quantity);
+  ACTION received(name oracle_name, name to, checksum256 ref, asset quantity, uint8_t chain_id, bool confirmed);
+  ACTION claimed(name oracle_name, uint64_t id, checksum256 to_eth, asset quantity);
   ACTION regoracle(name oracle_name);
   ACTION unregoracle(name oracle_name);
   ACTION sign(string signature);
   ACTION delreceipts();
-  ACTION delteles();
+  ACTION delteles(uint64_t to_id);
 
   /**
    * @brief Freeze specific actions
@@ -188,7 +183,7 @@ public:
    * 
    * @param min Minimum amount
    */
-  ACTION changemin(const asset min);
+  ACTION setmin(const asset min);
 
   /**
    * @brief Change fee 
@@ -196,7 +191,14 @@ public:
    * @param fee New fee
    * @return ACTION 
    */
-  ACTION changefee(const asset fixfee, const double varfee);
+  ACTION setfee(const asset fixfee, const double varfee);
+
+  /**
+   * @brief Change the amount of needed confirmations
+   * 
+   * @param confirms New amount of needed confirations
+   */
+  ACTION setthreshold(const uint32_t threshold);
 
   /**
    * @brief Pay out the collected fees to the oracles. Everyone can run this action

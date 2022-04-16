@@ -38,6 +38,7 @@ describe('teleporteos', async () => {
   before(async () => {
     await seedAccounts();
   });
+  // Initialize contract
   context('initialize contract', async () => {
     context('without correct auth', async () => {
       it('should fail with auth error', async () => {
@@ -68,9 +69,11 @@ describe('teleporteos', async () => {
         chai.expect(item.min).equal(1000000, 'Wrong minimum transfer amount');
         chai.expect(item.fixfee).equal(0, 'Wrong fix fee');
         chai.expect(item.varfee).equal('0.00000000000000000', 'Wrong variable fee');
+        chai.expect(item.version).above(0, 'Wrong version');
       });
     });
   });
+  // Recoracle
   context('regoracle', async () => {
     context('without correct auth', async () => {
       it('should fail with auth error', async () => {
@@ -110,6 +113,7 @@ describe('teleporteos', async () => {
       });
     });
   });
+  // Unrecoracle
   context('unregoracle', async () => {
     context('with incorrect auth', async () => {
       it('should fail with auth error', async () => {
@@ -163,9 +167,7 @@ describe('teleporteos', async () => {
               `123.0000 ${token_symbol}`,
               2,
               true,
-              {
-                from: sender1,
-              }
+              { from: sender1 }
             )
           );
         });
@@ -179,9 +181,7 @@ describe('teleporteos', async () => {
             `123.0000 ${token_symbol}`,
             2,
             true,
-            {
-              from: oracle3,
-            }
+            { from: oracle3 }
           );
         });
         it('should insert into receipt table', async () => {
@@ -210,9 +210,7 @@ describe('teleporteos', async () => {
           `123.0000 ${token_symbol}`,
           2,
           true,
-          {
-            from: oracle1,
-          }
+          { from: oracle1 }
         );
       });
     });
@@ -226,9 +224,7 @@ describe('teleporteos', async () => {
             `0.1230 ${token_symbol}`,
             2,
             true,
-            {
-              from: oracle3,
-            }
+            { from: oracle3 }
           ),
           'Quantity mismatch'
         );
@@ -244,9 +240,7 @@ describe('teleporteos', async () => {
             `123.0000 ${token_symbol}`,
             2,
             true,
-            {
-              from: oracle3,
-            }
+            { from: oracle3 }
           ),
           'Account mismatch'
         );
@@ -262,9 +256,7 @@ describe('teleporteos', async () => {
             `123.0000 ${token_symbol}`,
             2,
             true,
-            {
-              from: oracle3,
-            }
+            { from: oracle3 }
           ),
           'Oracle has already approved'
         );
@@ -311,6 +303,7 @@ describe('teleporteos', async () => {
       });
     });
   });
+  // Recrepair
   context('recrepair', async () => {
     before(async () => {
       await teleporteos.received(
@@ -320,9 +313,7 @@ describe('teleporteos', async () => {
         `0.1230 ${token_symbol}`,
         2,
         true,
-        {
-          from: oracle1,
-        }
+        { from: oracle1 }
       );
     });
     context('with wrong auth', async () => {
@@ -374,9 +365,7 @@ describe('teleporteos', async () => {
             `124.0000 ${token_symbol}`,
             [oracle1.name],
             false,
-            {
-              from: teleporteos.account,
-            }
+            { from: teleporteos.account }
           );
         });
         it('should update the receipts table', async () => {
@@ -408,6 +397,7 @@ describe('teleporteos', async () => {
       });
     });
   });
+  // Teleport
   context('teleport', async () => {
     context('without valid auth', async () => {
       it('should fail with auth error', async () => {
@@ -501,7 +491,7 @@ describe('teleporteos', async () => {
       });
     });
   });
-
+  // Adjust minimum amount
   context('adjust minimum amount', async () => {
     context('with incorrect auth', async () => {
       it('should fail with auth error', async () => {
@@ -532,7 +522,7 @@ describe('teleporteos', async () => {
       });
     });
   });
-  
+  // Adjust fee
   context('adjust fee', async () => {
     context('with incorrect auth', async () => {
       it('should fail with auth error', async () => {
@@ -579,12 +569,112 @@ describe('teleporteos', async () => {
       it('should succeed', async () => {
         await teleporteos.setfee(`0.1000 ${token_symbol}`, '0.003', { from: teleporteos.account });
       });
+      it('should update stats table', async () => {
+        let { rows: [item] } = await teleporteos.statsTable();
+        chai.expect(item.fixfee).equal(1000, 'Wrong fix fee');
+        chai.expect(item.varfee).equal('0.00300000000000000', 'Wrong variable fee');
+      });
+      it('should succeed withdraw and deposit', async () => {
+        await teleporteos.withdraw(sender1.name, `1.0000 ${token_symbol}`, { from: sender1 });
+        {
+          let { rows } = await teleporteos.depositsTable();
+          for(let item of rows){
+            if(item.account == sender1.name){
+              chai.expect(item.quantity).equal(`100.0000 ${token_symbol}`, 'Wrong deposit on withdraw');
+              break;
+            }
+          }
+        }
+        let { rows: [item_balance] } = await alienworldsToken.accountsTable({scope: sender1.name})
+        chai.expect(item_balance.balance).equal(`999900.0000 ${token_symbol}`, 'Wrong balance after withdraw');
+        await alienworldsToken.transfer(
+          sender1.name,
+          teleporteos.account.name,
+          `200.0000 ${token_symbol}`,
+          'teleport test',
+          { from: sender1 }
+        );
+        let deposits = await teleporteos.depositsTable();
+        for(let item of deposits.rows){
+          if(item.account == sender1.name){
+            chai.expect(item.quantity).equal(`300.0000 ${token_symbol}`, 'Wrong balance on deposit');
+            break;
+          }
+        }
+      });
+      it('should succeed teleport', async () => {
+        await teleporteos.teleport(sender1.name, `200.0000 ${token_symbol}`, 2, ethToken, { from: sender1 });
+        let deposits = await teleporteos.depositsTable();
+        for(let item of deposits.rows){
+          if(item.account == sender1.name){
+            chai.expect(item.quantity).equal(`100.0000 ${token_symbol}`, 'Wrong balance on deposit');
+            break;
+          }
+        }
+        // Check collected amount
+        const value = BigInt(2000000);
+        const fee = calcFee(value, BigInt(1000), 0.003);
+        let { rows: [stat] } = await teleporteos.statsTable();
+        chai.expect(stat.collected.toString()).equal(fee.toString(), "Wrong collected fee amount");
+        // check teleport amount 
+        let teleports = await teleporteos.teleportsTable({reverse: true});
+        chai.expect(teleports.rows[0].quantity).equal(amountToAsset(value - fee, token_symbol, 4), "Wrong fee calculation");
+      });
+      it('should succeed receipt', async () => {
+        // Get current balance of sender 1 on token contract
+        let { rows: [a_item_old] } = await alienworldsToken.accountsTable({scope: sender1.name})
+        let sender1Balance = stringToAsset(a_item_old.balance).amount;
+        // Get current balance of sender 1 on deposits
+        let sender1DepositBalance = BigInt(0);
+        let deposits_old = await teleporteos.depositsTable();
+        for(let item of deposits_old.rows){
+          if(item.account == sender1.name){
+            sender1DepositBalance = stringToAsset(item.quantity).amount
+            break;
+          }
+        }
+        // Get current stat
+        let { rows: [stat_old] } = await teleporteos.statsTable()
+        // Send received action by three oracles, so it should be completed
+        const hash = '1111111111111111111111111111111111111111111111111111111111111113';
+        const sendAmount = BigInt(1230);
+        const sendAsset = amountToAsset(sendAmount, token_symbol, 4);
+        // Execute recepits with three oracles
+        await teleporteos.received(
+          oracle1.name, sender1.name, hash, sendAsset, 2, true, { from: oracle1 }
+        );
+        await teleporteos.received(
+          oracle2.name, sender1.name, hash, sendAsset, 2, true, { from: oracle2 }
+        );
+        await teleporteos.received(
+          oracle3.name, sender1.name, hash, sendAsset, 2, true, { from: oracle3 }
+        );
+        let { rows: [confirmedItem] } = await teleporteos.receiptsTable({
+          keyType: 'sha256', 
+          indexPosition: 2, 
+          tableKey: hash
+        });
+        chai.expect(confirmedItem.confirmations).equal(3, "Wrong amount of confirmations");
+        chai.expect(confirmedItem.completed).equal(true, "Not completed"); 
+        // Check collected
+        const fee = calcFee(sendAmount, BigInt(1000), 0.003);
+        let { rows: [stat_new] } = await teleporteos.statsTable();
+        chai.expect(stat_new.collected.toString()).equal((BigInt(stat_old.collected) + fee).toString(), "Collected got wrong amount of fees");
+        // Check new balance on token contract
+        let { rows: [a_item_new] } = await alienworldsToken.accountsTable({scope: sender1.name})
+        chai.expect(stringToAsset(a_item_new.balance).amount.toString()).equal((sender1Balance + sendAmount - fee).toString(), "New Balance reduced by a fee is wrong");
+        // Check if deposit table is unchanged
+        let deposits_new = await teleporteos.depositsTable();
+        for(let item of deposits_new.rows){
+          if(item.account == sender1.name){
+            chai.expect(stringToAsset(item.quantity).amount.toString()).equal(sender1DepositBalance.toString(), "Deposit has changed")
+            break;
+          }
+        }
+      });
     });
-    // TODO: Check stats table
-    // TODO: Withdraw and Deposit with no fees
-    // TODO: Teleport, fee reduces the  
   });
-  
+  // Adjust threshold
   context('adjust threshold', async () => {
     context('with incorrect auth', async () => {
       it('should fail with auth error', async () => {
@@ -609,7 +699,7 @@ describe('teleporteos', async () => {
     // TODO: Check if further confirmation fails
     });
   });
-  
+  // Delete teleports
   context('delete teleports', async () => {
     context('with incorrect auth', async () => {
       it('should fail with auth error', async () => {
@@ -622,7 +712,7 @@ describe('teleporteos', async () => {
     context('with not available id', async () => {
       it('should fail', async () => {
         await assertEOSErrorIncludesMessage(
-          teleporteos.delteles('1', { from: teleporteos.account }), 
+          teleporteos.delteles('100', { from: teleporteos.account }), 
           'Teleport id not found'
         );
       });
@@ -697,18 +787,14 @@ async function issueTokens() {
     await alienworldsToken.create(
       alienworldsToken.account.name,
       `1000000000.0000 ${token_symbol}`,
-      {
-        from: alienworldsToken.account,
-      }
+      { from: alienworldsToken.account }
     );
 
     await alienworldsToken.issue(
       alienworldsToken.account.name,
       `10000000.0000 ${token_symbol}`,
       'initial deposit',
-      {
-        from: alienworldsToken.account,
-      }
+      { from: alienworldsToken.account }
     );
   } catch (e) {
     if ((e as { json: {error: {what: string } } }).json.error.what != 'eosio_assert_message assertion failure') {
@@ -731,4 +817,24 @@ async function issueTokens() {
     'inital balance',
     { from: alienworldsToken.account }
   );
+}
+
+function amountToAsset(amount: bigint, symbol_name: string, precision: number){
+  let s = amount.toString();
+  let p = s.length - precision;
+  let int = s.substring(0, p);
+  return `${int? int : '0'}${'.'}${s.substring(p)} ${symbol_name}`; 
+}
+
+function stringToAsset(asset_str: string){
+  let s = asset_str.indexOf('.');
+  let e = asset_str.indexOf(' ', s);
+  let precision = e - s;
+  let name = asset_str.substring(e + 1).trim();
+  let amount =  BigInt(asset_str.substring(0, s) + asset_str.substring(s + 1, e));
+  return {amount, symbol: {precision, name}}
+}
+
+function calcFee(amount: bigint, fixfeeAmount: bigint, varfee: number){
+  return BigInt(Math.floor(Number(amount) * varfee)) + fixfeeAmount;
 }

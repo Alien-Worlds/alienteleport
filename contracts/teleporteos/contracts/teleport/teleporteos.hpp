@@ -26,6 +26,7 @@ private:
     bool fout;              // Freeze outgoing funds
     bool foracles;          // Freeze oracles
     bool fcancel;           // Freeze cancel action
+    uint32_t version;       // Version of this teleport contract
 
     uint64_t primary_key() const { return symbol.raw(); }
   };
@@ -99,11 +100,6 @@ private:
       receipts_table;
 
   stats_table _stats;
-  deposits_table _deposits;
-  oracles_table _oracles;
-  receipts_table _receipts;
-  teleports_table _teleports;
-  cancels_table _cancels;
 
   void require_oracle(const name account);
 
@@ -126,9 +122,11 @@ private:
 
   /**
    * @brief Send payments to all oracles
-   * @param stat 
+   * 
+   * @param stat Iterator to the stats table entry
+   * @return The rest amount which can not be divided 
    */
-  void paymentsToOracles(stats_table::const_iterator stat);
+  uint64_t paymentsToOracles(stats_table::const_iterator stat);
 
 public:
   using contract::contract;

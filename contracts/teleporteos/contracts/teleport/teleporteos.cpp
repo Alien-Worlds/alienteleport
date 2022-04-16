@@ -4,12 +4,7 @@ using namespace alienworlds;
 
 teleporteos::teleporteos(name s, name code, datastream<const char *> ds)
   : contract(s, code, ds),
-    _stats(get_self(), get_self().value), 
-    _deposits(get_self(), get_self().value),
-    _oracles(get_self(), get_self().value),
-    _receipts(get_self(), get_self().value),
-    _teleports(get_self(), get_self().value),
-    _cancels(get_self(), get_self().value) {}
+   _stats(get_self(), get_self().value) {}
 
 ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee, const bool freeze, const uint32_t threshold){
   require_auth(get_self());
@@ -18,6 +13,7 @@ ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee
   check(fixfee.symbol == TOKEN_SYMBOL, "Wrong token symbol of fee");
   check(threshold > 0, "Needed confirmation amount has to be grater than 0");
   check(varfee <= 0.2 && varfee >= 0, "Variable fee has to be between 0 and 0.20");
+
   check(_stats.find(TOKEN_SYMBOL.raw()) == _stats.end(), "Already initialized");
 
   auto stat = _stats.emplace(get_self(), [&](auto &s) {
@@ -32,6 +28,7 @@ ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee
     s.fcancel = freeze;
     s.oracles = 0;
     s.threshold = threshold;
+    s.version = 1;
   });
 
   uint64_t fee = calc_fee(stat, min.amount);
@@ -52,6 +49,7 @@ ACTION teleporteos::transfer(name from, name to, asset quantity, string memo) {
 ACTION teleporteos::withdraw(name account, asset quantity) {
   require_auth(account);
 
+  deposits_table _deposits(get_self(), get_self().value);
   auto deposit = _deposits.find(account.value);
   check(deposit != _deposits.end(), "Deposit not found, please transfer the tokens first");
   check(deposit->quantity >= quantity, "Withdraw amount exceeds deposit");
@@ -80,6 +78,7 @@ ACTION teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checks
   check(quantity.amount >= stat->min, "Transfer is below minimum token amount");
   check(!stat->fin, "Teleport is currently deactivated");
 
+  deposits_table _deposits(get_self(), get_self().value);
   auto deposit = _deposits.find(from.value);
   check(deposit != _deposits.end(), "Deposit not found, please transfer the tokens first");
   check(deposit->quantity >= quantity, "Not enough deposited");
@@ -99,6 +98,7 @@ ACTION teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checks
   quantity.amount -= fee;
 
   // Emplace teleport
+  teleports_table _teleports(get_self(), get_self().value);
   uint64_t next_teleport_id = _teleports.available_primary_key();
   uint32_t now = current_time_point().sec_since_epoch();
   _teleports.emplace(from, [&](auto &t) {
@@ -119,6 +119,7 @@ ACTION teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checks
 
 /* Cancels a teleport after 30 days and no claim */
 ACTION teleporteos::cancel(uint64_t id) {
+  teleports_table _teleports(get_self(), get_self().value);
   auto teleport = _teleports.find(id);
   check(teleport != _teleports.end(), "Teleport not found");
 
@@ -131,6 +132,7 @@ ACTION teleporteos::cancel(uint64_t id) {
   check((teleport->time + thirty_two_days) < now, "Teleport has not expired");
 
   // Refund the teleport and mark it as cancelled
+  cancels_table _cancels(get_self(), get_self().value);
   auto existing = _cancels.find(id);
   check(existing == _cancels.end(), "Teleport has already been cancelled");
 
@@ -157,6 +159,7 @@ ACTION teleporteos::sign(name oracle_name, uint64_t id, string signature) {
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
   check(!stat->foracles, "Oracle actions are freezed");
 
+  teleports_table _teleports(get_self(), get_self().value);
   auto teleport = _teleports.find(id);
   check(teleport != _teleports.end(), "Teleport not found");
 
@@ -176,6 +179,7 @@ ACTION teleporteos::received(name oracle_name, name to, checksum256 ref, asset q
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
   check(!stat->foracles, "Oracle actions are freezed");
 
+  receipts_table _receipts(get_self(), get_self().value);
   auto ref_ind = _receipts.get_index<"byref"_n>();
   auto receipt = ref_ind.find(ref);
 
@@ -240,6 +244,7 @@ ACTION teleporteos::received(name oracle_name, name to, checksum256 ref, asset q
 ACTION teleporteos::repairrec(uint64_t id, asset quantity, vector<name> approvers, bool completed) {
   require_auth(get_self());
 
+  receipts_table _receipts(get_self(), get_self().value);
   auto receipt = _receipts.require_find(id, "Receipt does not exist.");
 
   check(quantity.amount > 0, "Quantity cannot be negative");
@@ -262,6 +267,7 @@ ACTION teleporteos::claimed(name oracle_name, uint64_t id, checksum256 to_eth, a
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
   check(!stat->foracles, "Oracle actions are freezed");
 
+  teleports_table _teleports(get_self(), get_self().value);
   auto teleport = _teleports.find(id);
   check(teleport != _teleports.end(), "Teleport not found");
 
@@ -277,6 +283,7 @@ ACTION teleporteos::regoracle(name oracle_name) {
 
   check(is_account(oracle_name), "Oracle account does not exist");
 
+  oracles_table _oracles(get_self(), get_self().value);
   _oracles.emplace(get_self(), [&](auto &o) { o.account = oracle_name; });
 
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
@@ -286,6 +293,7 @@ ACTION teleporteos::regoracle(name oracle_name) {
 ACTION teleporteos::unregoracle(name oracle_name) {
   require_auth(get_self());
 
+  oracles_table _oracles(get_self(), get_self().value);
   auto oracle = _oracles.find(oracle_name.value);
   check(oracle != _oracles.end(), "Oracle does not exist");
 
@@ -300,6 +308,7 @@ ACTION teleporteos::unregoracle(name oracle_name) {
 ACTION teleporteos::delreceipts(time_point_sec to_date) {
   require_auth(get_self());
 
+  receipts_table _receipts(get_self(), get_self().value);
   auto receipt = _receipts.begin();
   while (receipt != _receipts.end()) {
     if(receipt->date < to_date){
@@ -312,10 +321,12 @@ ACTION teleporteos::delreceipts(time_point_sec to_date) {
 
 ACTION teleporteos::delteles(uint64_t to_id) {
   require_auth(get_self());
+  teleports_table _teleports(get_self(), get_self().value);
   auto del_to = _teleports.find(to_id);
   check(del_to != _teleports.end(), "Teleport id not found");
 
   // Delete all cancels and regarding teleports which id is less than to_id
+  cancels_table _cancels(get_self(), get_self().value);
   auto ci = _cancels.begin();
   while (ci != _cancels.end() && ci->teleport_id < to_id) {
     auto tp = _teleports.find(ci->teleport_id);
@@ -367,12 +378,14 @@ ACTION teleporteos::setfee(const asset fixfee, const double varfee){
   check(fixfee.symbol == TOKEN_SYMBOL, "Wrong token");
   check(varfee <= 0.2 && varfee >= 0, "Variable fee has to be between 0 and 0.20");
 
-  paymentsToOracles(stat);
+  // Pay off all oracles first
+  auto rest = paymentsToOracles(stat);
 
+  // Set new fee and remaining collected
   _stats.modify(*stat, same_payer, [&](auto &s) { 
     s.fixfee = fixfee.amount;
     s.varfee = varfee;
-    s.collected = 0;
+    s.collected = rest;
   });
 
   uint64_t fee = calc_fee(stat, stat->min);
@@ -390,9 +403,9 @@ ACTION teleporteos::setthreshold(const uint32_t threshold){
 
 ACTION teleporteos::payoracles(){
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
-  paymentsToOracles(stat);
+  auto rest = paymentsToOracles(stat);
   _stats.modify(*stat, same_payer, [&](auto &s) { 
-    s.collected = 0;
+    s.collected = rest;
   });
 }
 
@@ -400,6 +413,7 @@ ACTION teleporteos::payoracles(){
 
 void teleporteos::require_oracle(const name account) {
   require_auth(account);
+  oracles_table _oracles(get_self(), get_self().value);
   _oracles.get(account.value, "Account is not an oracle");
 }
 
@@ -412,6 +426,7 @@ uint64_t teleporteos::calc_fee(stats_table::const_iterator stat, const uint64_t 
 }
 
 void teleporteos::addDeposit(const name from, const asset quantity){
+  deposits_table _deposits(get_self(), get_self().value);
   auto deposit = _deposits.find(from.value);
   if (deposit == _deposits.end()) {
     _deposits.emplace(get_self(), [&](auto &d) {
@@ -423,11 +438,17 @@ void teleporteos::addDeposit(const name from, const asset quantity){
   }
 }
 
-void teleporteos::paymentsToOracles(stats_table::const_iterator stat){
-  check(stat->oracles > 0, "There are no oracles");
-  uint64_t quantity = stat->collected / stat->oracles;
-  check(quantity == 0, "Pay off amount is too low");
-  for (auto itr = _oracles.cbegin(); itr != _oracles.cend(); itr++) {
-    addDeposit(itr->account, asset(quantity, stat->symbol));
+uint64_t teleporteos::paymentsToOracles(stats_table::const_iterator stat){
+  if(stat->collected == 0 || stat->oracles == 0){
+    return stat->collected;
   }
+  uint64_t quantity = stat->collected / stat->oracles;
+  uint64_t rest = stat->collected - (quantity * stat->oracles);
+  if(quantity != 0){
+    oracles_table _oracles(get_self(), get_self().value);
+    for (auto itr = _oracles.cbegin(); itr != _oracles.cend(); itr++) {
+      addDeposit(itr->account, asset(quantity, stat->symbol));
+    }
+  }
+  return rest;
 }

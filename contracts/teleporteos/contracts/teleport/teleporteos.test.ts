@@ -113,6 +113,7 @@ describe('teleporteos', async () => {
       });
     });
   });
+
   // Unrecoracle
   context('unregoracle', async () => {
     context('with incorrect auth', async () => {
@@ -303,6 +304,7 @@ describe('teleporteos', async () => {
       });
     });
   });
+
   // Recrepair
   context('recrepair', async () => {
     before(async () => {
@@ -397,6 +399,7 @@ describe('teleporteos', async () => {
       });
     });
   });
+
   // Teleport
   context('teleport', async () => {
     context('without valid auth', async () => {
@@ -491,6 +494,85 @@ describe('teleporteos', async () => {
       });
     });
   });
+
+  // Sign
+  context('sign teleport', async () => {
+    context('with incorrect auth', async () => {
+      it('should fail', async () => {
+        await assertMissingAuthority(
+          teleporteos.sign(oracle1.name, 0, 'abcdefghijklmnopabcdefghijklmnopabcdefghijklmnop', { from: sender1 })
+        );
+        await assertMissingAuthority(
+          teleporteos.sign(oracle1.name, 0, 'abcdefghijklmnopabcdefghijklmnopabcdefghijklmnop', { from: oracle2 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      it('wrong parameters', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.sign(oracle1.name, 10, 'abcdefghijklmnopabcdefghijklmnopabcdefghijklmnop', { from: oracle1 }),
+          'Teleport not found'
+        );
+      });
+      it('should succeed', async () => {
+        await teleporteos.sign(oracle1.name, 0, 'abcdefghijklmnopabcdefghijklmnopabcdefghijklmnop', { from: oracle1 });
+        const { rows: [item] } = await teleporteos.teleportsTable({lowerBound: '0'});
+        chai.expect(item.id).equal(0, 'Wrong id');
+        chai.expect(item.oracles.length).equal(1, 'Wrong sign amount of oracles');
+        chai.expect(item.oracles[0]).equal(oracle1.name, 'Wrong oracle');
+      });
+      it('refuse double signing', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.sign(oracle1.name, 0, 'abc', { from: oracle1 }),
+          'Oracle has already signed'
+        );
+      });
+      it('refuse same signature', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.sign(oracle2.name, 0, 'abcdefghijklmnopabcdefghijklmnopabcdefghijklmnop', { from: oracle2 }),
+          'Already signed with this signature'
+        );
+      });
+    });
+  });
+  
+  // Teleport claimed
+  context('set teleport claimed', async () => {
+    context('with incorrect auth', async () => {
+      it('should fail', async () => {
+        await assertMissingAuthority(
+          teleporteos.claimed(oracle1.name, 0, ethToken, `123.0000 ${token_symbol}`, { from: sender1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      context('wrong parameters', async () => {
+        it('should fail', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.claimed(oracle1.name, 10, ethToken, `123.0000 ${token_symbol}`, { from: oracle1 }),
+            'Teleport not found'
+          )
+          await assertEOSErrorIncludesMessage(
+            teleporteos.claimed(oracle1.name, 0, ethToken, `1.0000 ${token_symbol}`, { from: oracle1 }),
+            'Quantity mismatch'
+          )
+        });
+      });
+      it('should succeed', async () => {
+        await teleporteos.claimed(oracle1.name, 0, ethToken, `123.0000 ${token_symbol}`, { from: oracle1 });
+        const { rows: [item] } = await teleporteos.teleportsTable({lowerBound: '0'});
+        chai.expect(item.id).equal(0, 'Wrong id');
+        chai.expect(item.claimed).equal(true);
+      });
+      it('should refuse double claiming', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.claimed(oracle1.name, 0, ethToken, `123.0000 ${token_symbol}`, { from: oracle1 }),
+          'Already marked as claimed'
+        )
+      });
+    });
+  });
+
   // Adjust minimum amount
   context('adjust minimum amount', async () => {
     context('with incorrect auth', async () => {
@@ -522,6 +604,7 @@ describe('teleporteos', async () => {
       });
     });
   });
+
   // Adjust fee
   context('adjust fee', async () => {
     context('with incorrect auth', async () => {
@@ -652,7 +735,7 @@ describe('teleporteos', async () => {
         let { rows: [confirmedItem] } = await teleporteos.receiptsTable({
           keyType: 'sha256', 
           indexPosition: 2, 
-          tableKey: hash
+          lowerBound: hash
         });
         chai.expect(confirmedItem.confirmations).equal(3, "Wrong amount of confirmations");
         chai.expect(confirmedItem.completed).equal(true, "Not completed"); 
@@ -674,6 +757,7 @@ describe('teleporteos', async () => {
       });
     });
   });
+
   // Adjust threshold
   context('adjust threshold', async () => {
     context('with incorrect auth', async () => {
@@ -692,13 +776,48 @@ describe('teleporteos', async () => {
           );
         });
       });
-    // TODO: Add new receipts 
-    // TODO: Check if it is not confirmed
-    // TODO: Confirm one more time
-    // TODO: Check if it is confirmed now
-    // TODO: Check if further confirmation fails
+      it('should succeed receipt', async () => {
+        // Set threshold to 2
+        await teleporteos.setthreshold(2, { from: teleporteos.account })
+        // Check stats
+        let { rows: [stat] } = await teleporteos.statsTable();
+        chai.expect(stat.threshold).equal(2, "Threshold was not was not inherited");
+        // Send received action by three oracles, so it should be completed
+        const hash = '1111111111111111111111111111111111111111111111111111111111111114';
+        const sendAmount = BigInt(10000);
+        const sendAsset = amountToAsset(sendAmount, token_symbol, 4);
+        // Execute recepits by one oracles
+        await teleporteos.received(
+          oracle1.name, sender1.name, hash, sendAsset, 1, true, { from: oracle1 }
+        );
+        let { rows: [unconfItem] } = await teleporteos.receiptsTable({
+          keyType: 'sha256', 
+          indexPosition: 2,
+          lowerBound: hash
+        });
+        chai.expect(unconfItem.confirmations).equal(1, "Wrong amount of confirmations");
+        chai.expect(unconfItem.completed).equal(false, "Is completed");
+        // Execute recepits by a second oracles
+        await teleporteos.received(
+          oracle2.name, sender1.name, hash, sendAsset, 1, true, { from: oracle2 }
+        );
+        let { rows: [confItem] } = await teleporteos.receiptsTable({
+          keyType: 'sha256', 
+          indexPosition: 2, 
+          lowerBound: hash
+        });
+        chai.expect(confItem.confirmations).equal(2, "Wrong amount of confirmations");
+        chai.expect(confItem.completed).equal(true, "Is not completed");
+        
+        // Execute recepits by a third oracles
+        await assertEOSErrorIncludesMessage(
+          teleporteos.received(oracle3.name, sender1.name, hash, sendAsset, 1, true, { from: oracle3 }), 
+          'This teleport is already completed'
+        );
+      });
     });
   });
+
   // Delete teleports
   context('delete teleports', async () => {
     context('with incorrect auth', async () => {
@@ -706,9 +825,11 @@ describe('teleporteos', async () => {
         await assertMissingAuthority(
           teleporteos.delteles('0', { from: sender1 })
         );
+        await assertMissingAuthority(
+          teleporteos.delteles('0', { from: oracle1 })
+        );
       });
     });
-    
     context('with not available id', async () => {
       it('should fail', async () => {
         await assertEOSErrorIncludesMessage(
@@ -717,15 +838,128 @@ describe('teleporteos', async () => {
         );
       });
     });
+    it('preparation', async () => {
+      // Add three teleports
+      await teleporteos.teleport(alienworldsToken.account.name, `203.0000 ${token_symbol}`, 1, ethToken, { from: alienworldsToken.account });
+      await teleporteos.teleport(alienworldsToken.account.name, `203.0000 ${token_symbol}`, 2, ethToken, { from: alienworldsToken.account });
+      await teleporteos.teleport(alienworldsToken.account.name, `203.0000 ${token_symbol}`, 3, ethToken, { from: alienworldsToken.account });
+      const fee = calcFee(BigInt(2030000), BigInt(1000), 0.003);
+      const sendAsset = amountToAsset(BigInt(2030000) - fee, token_symbol, 4);
+      // Claim all teleports but not the second in table 
+      await teleporteos.claimed(oracle1.name, 2, ethToken, sendAsset, { from: oracle1 });
+      await teleporteos.claimed(oracle1.name, 3, ethToken, sendAsset, { from: oracle1 });
+      await teleporteos.claimed(oracle1.name, 4, ethToken, sendAsset, { from: oracle1 });
+    });
     context('with correct auth', async () => {
-      // TODO: Add three teleports
-      // TODO: Delete until a speific one
-      // TODO: Specific one should still be there and all below deleted
-      // TODO: Should fail to sign a deleted teleport
-      // TODO: Should add a new teleport in the front
-      // TODO: Should fail to sign a old 
-      // TODO: Delete until last id
-      // TODO: Last if should still be there and all below deleted
+      context('delete to id 2', async () => {
+        it('should succeed', async () => {
+            // Delete until the third one
+            await teleporteos.delteles('2', { from: teleporteos.account });
+            const teleports = await teleporteos.teleportsTable();
+            chai.expect(teleports.rows.length).equal(4, 'Wrong amount of teleports are deleted');
+            chai.expect(teleports.rows[0].id).equal(1, 'Wrong deletion');
+            chai.expect(teleports.rows[1].id).equal(2, 'Wrong deletion');
+            chai.expect(teleports.rows[2].id).equal(3, 'Wrong deletion');
+            chai.expect(teleports.rows[3].id).equal(4, 'Wrong deletion');
+        });
+      });
+      context('delete to last id', async () => {
+        it('should fail', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.delteles('5', { from: teleporteos.account }), 
+            'Teleport id not found'
+          );
+        });
+        it('should succeed', async () => {
+          // Delete until the third one
+          await teleporteos.delteles('4', { from: teleporteos.account });
+          const teleports = await teleporteos.teleportsTable();
+          chai.expect(teleports.rows.length).equal(2, 'Wrong amount of teleports are deleted');
+          chai.expect(teleports.rows[0].id).equal(1, 'Wrong deletion');
+          chai.expect(teleports.rows[1].id).equal(4, 'Wrong deletion');
+        });
+      });
+    });
+  });
+
+  // Cancel action
+  context('cancel teleport', async () => {
+    context('with incorrect auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.cancel('1', { from: oracle1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      it('should fail when it is claimed', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.cancel('4', { from: alienworldsToken.account }),
+          'Teleport is already claimed'
+        );
+      });
+      it('should fail when it is too early', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.cancel('1', { from: sender1 }),
+          'Teleport has not expired'
+        );
+      });
+    });
+  });
+
+  // Pay oracles
+  context('pay oracles', async () => {
+    const {rows: [initialStat]} = await teleporteos.statsTable();
+    const amountPerOracle = Math.floor(Number(initialStat.collected) / initialStat.oracles);
+    const rest = Number(initialStat.collected) - amountPerOracle;
+    it('should succeed', async () => {
+      await teleporteos.payoracles({ from: sender1 });
+    });
+    // Check rest
+    const {rows: [stat]} = await teleporteos.statsTable();
+    chai.expect(stat.collected).equal(rest, 'Wrong collected rest');
+    // Check oracle deposit amounts
+    const deposits = await teleporteos.depositsTable({lowerBound: oracle1.name});
+    chai.expect(stringToAsset(deposits.rows[0].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle');
+    chai.expect(stringToAsset(deposits.rows[1].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle');
+    chai.expect(stringToAsset(deposits.rows[2].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle');
+  });
+
+  // Delete receipts
+  context('delete receipts', async () => {
+    const initialReceipts = await teleporteos.receiptsTable();
+    const secondDate = initialReceipts.rows[1].date;
+    const lastDate = initialReceipts.rows[initialReceipts.rows.length - 1].date;
+    context('with incorrect auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.delreceipts(lastDate, { from: sender1 })
+        );
+        await assertMissingAuthority(
+          teleporteos.delreceipts(lastDate, { from: oracle1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      context('delete to id 2', async () => {
+        it('should succeed', async () => {
+            // Delete until the third one
+            await teleporteos.delreceipts(secondDate, { from: teleporteos.account });
+            const receipts = await teleporteos.receiptsTable();
+            chai.expect(receipts.rows.length).equal(3, 'Wrong amount of receipts are deleted');
+            chai.expect(receipts.rows[0].id).equal(1, 'Wrong deletion');
+            chai.expect(receipts.rows[1].id).equal(2, 'Wrong deletion');
+            chai.expect(receipts.rows[2].id).equal(3, 'Wrong deletion');
+        });
+      });
+      context('delete all', async () => {
+        it('should succeed', async () => {
+          // Delete until the third one
+          await teleporteos.delreceipts(new Date(lastDate.getTime() + 1), { from: teleporteos.account });
+          const receipts = await teleporteos.receiptsTable();
+          chai.expect(receipts.rows.length).equal(0, 'Not all deleted');
+        });
+      });
     });
   });
 });

@@ -167,6 +167,10 @@ ACTION teleporteos::sign(name oracle_name, uint64_t id, string signature) {
                             oracle_name);
   check(find_res == teleport->oracles.end(), "Oracle has already signed");
 
+  for(auto &sig : teleport->signatures){
+    check(sig != signature, "Already signed with this signature");
+  }
+
   _teleports.modify(*teleport, get_self(), [&](auto &t) {
     t.oracles.push_back(oracle_name);
     t.signatures.push_back(signature);
@@ -204,7 +208,7 @@ ACTION teleporteos::received(name oracle_name, name to, checksum256 ref, asset q
     });
   } else {
     if (confirmed) {
-      check(!receipt->completed, "This teleport has already completed");
+      check(!receipt->completed, "This teleport is already completed");
 
       check(receipt->quantity == quantity, "Quantity mismatch");
       check(receipt->to == to, "Account mismatch");

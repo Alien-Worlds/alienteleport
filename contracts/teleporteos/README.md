@@ -4,6 +4,7 @@
 - Adjustable amount of needed oracle confirmations for a receiving teleport
 - Adjustable minimum amount for deposits and teleports 
 - Option to delete old teleport and cancel entries without losing consensus 
+- Store all needed bridge data in stats table for interoperability with custom front end apps
 
 # Deployment and initialization
 
@@ -18,6 +19,18 @@ ACTION ini(asset min, uint64_t fixfee, double varfee, bool freeze, uint32_t thre
 - ***freeze*** True to freeze the contract until you unfreeze it with the freeze action.
 - ***threshold*** Amount of needed oracle confirmations for a receiving teleport
 
+3. Add the ethereum chains which are allowed
+```
+/**
+   * @brief Add a bridge to a new chain
+   * 
+   * @param name Name of the chain to bridge
+   * @param chain_id Identification number for this new chain
+   * @param net_id Unique network id to distinguish different chains. See "ChainID" for ethereum based chains on https://chainlist.org/ 
+   * @param contract Contract address
+   */
+  ACTION addchain(string name, uint8_t chain_id, string net_id, string contract);
+```
 With the freeze action you can freeze and unfreeze specific parts of the contract
 ```
 ACTION freeze(const bool in, const bool out, const bool oracles, const bool cancel);
@@ -29,8 +42,9 @@ ACTION freeze(const bool in, const bool out, const bool oracles, const bool canc
 
 ## Upgrade from running teleport contract of alien world
 
-Just deploy the contract over the old teleport contract account and run the ini action.
-Note: In this upgrade are additional tables, the structure of the old tables is not changed.
+Just deploy the contract over the old teleport contract account, run the ini action and add all connected chains by executing the addchain action.
+
+**Note:** In this upgrade are additional tables, the structure of the old tables is not changed.
 
 # Install test suite on windows
 

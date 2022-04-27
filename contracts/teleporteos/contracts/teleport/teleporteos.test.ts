@@ -43,18 +43,18 @@ describe('teleporteos', async () => {
     context('without correct auth', async () => {
       it('should fail with auth error', async () => {
         await assertMissingAuthority(
-          teleporteos.ini(`100.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, { from: sender1 })
+          teleporteos.ini(`100.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, 0, { from: sender1 })
         );
       });
     });
     context('with correct auth', async () => {
       it('should succeed', async () => {
-        await teleporteos.ini(`100.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, { from: teleporteos.account });
+        await teleporteos.ini(`100.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, 0, { from: teleporteos.account });
       });
 
       it('execute again should fail', async () => {
         await assertEOSErrorIncludesMessage(
-          teleporteos.ini(`50.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, { from: teleporteos.account }),
+          teleporteos.ini(`50.0000 ${token_symbol}`, `0.0000 ${token_symbol}`, '0', false, 3, 0, { from: teleporteos.account }),
           'Already initialized'
         );
       });
@@ -70,6 +70,70 @@ describe('teleporteos', async () => {
         chai.expect(item.fixfee).equal(0, 'Wrong fix fee');
         chai.expect(item.varfee).equal('0.00000000000000000', 'Wrong variable fee');
         chai.expect(item.version).above(0, 'Wrong version');
+        chai.expect(item.chains.length).equal(0, 'Wrong amount of added chains');
+      });
+    });
+  });
+  // Add chains
+  context('add chain', async () => {
+    context('without correct auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.addchain('ETH', 1, '1', '0x497329439abdc323u497329439abdc323u', { from: sender1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      const ethName = 'ETH'
+      const ethId = 1
+      const ethNetId = '1'
+      const ethContract = '0x497329439abdc323u497329439abdc323u'
+      it('should succeed', async () => {
+        await teleporteos.addchain(ethName, ethId, ethNetId, ethContract, { from: teleporteos.account })
+      });
+      it('should update stats table', async () => {
+        const { rows: [item] } = await teleporteos.statsTable()
+        chai.expect(item.chains.length).equal(1, 'Wrong amount of added chains')
+        chai.expect(item.chains[0].name).equal(ethName, 'Wrong chain name')
+        chai.expect(item.chains[0].id).equal(ethId, 'Wrong chain id')
+        chai.expect(item.chains[0].net_id).equal(ethNetId, 'Wrong chain name')
+        chai.expect(item.chains[0].contract).equal(ethContract, 'Wrong chain id')
+      });
+      it('should fail with already existing id', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.addchain('ETH', 1, '1', '0x497329439abdc323u497329439abdc323u', { from: teleporteos.account }), 
+          'This chain is already listed'
+        )
+      });
+      it('should succeed to add another three chains', async () => {
+        await teleporteos.addchain('BSC', 2, '2', '0x497329439abdc323u497329439abdc323u', { from: teleporteos.account })
+        await teleporteos.addchain('WAX', 6, '6', 'bridge.chain', { from: teleporteos.account })
+        await teleporteos.addchain('BTC', 3, '3', '0x497329439abdc323u497329439abdc323u', { from: teleporteos.account })
+        await teleporteos.addchain('TRON', 4, '4', '0x497329439abdc323u497329439abdc323u', { from: teleporteos.account })
+        await teleporteos.addchain('XMR', 5, '5', '0x497329439abdc323u497329439abdc323u', { from: teleporteos.account })
+      });
+      it('should update stats table', async () => {
+        const { rows: [item] } = await teleporteos.statsTable()
+        chai.expect(item.chains.length).equal(6, 'Wrong amount of added chains')
+      });
+    });
+  });
+  // Remove chain
+  context('remove chain', async () => {
+    context('without correct auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.rmchain(6, { from: sender1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      it('should succeed', async () => {
+        await teleporteos.rmchain(6, { from: teleporteos.account })
+      });
+      it('should update stats table', async () => {
+        const { rows: [item] } = await teleporteos.statsTable()
+        chai.expect(item.chains.length).equal(5, 'Wrong amount of remaining chains')
       });
     });
   });
@@ -480,7 +544,7 @@ describe('teleporteos', async () => {
             { from: sender1 }
           );
         });
-        it('should update table', async () => {
+        it('should update teleports table', async () => {
           let { rows: [item] } = await teleporteos.teleportsTable();
           chai.expect(item.account).equal(sender1.name);
           chai.expect(item.chain_id).equal(2);
@@ -1054,7 +1118,7 @@ async function issueTokens() {
 }
 
 function amountToAsset(amount: bigint, symbol_name: string, precision: number){
-  let s = amount.toString();
+  let s = amount.toString().padStart(precision, '0');;
   let p = s.length - precision;
   let int = s.substring(0, p);
   return `${int? int : '0'}${'.'}${s.substring(p)} ${symbol_name}`; 

@@ -14,6 +14,13 @@ namespace alienworlds {
 class [[eosio::contract("teleporteos")]] teleporteos : public contract {
 private:
 
+  struct chainData{
+    uint8_t id;
+    string name;
+    string net_id;
+    string contract;
+  };
+
   struct [[eosio::table("stats")]] stats_item {
     symbol symbol;          // Symbol for the token
     uint64_t min;           // Minimum amount for token teleport
@@ -26,7 +33,9 @@ private:
     bool fout;              // Freeze outgoing funds
     bool foracles;          // Freeze oracles
     bool fcancel;           // Freeze cancel action
+    uint8_t id;             // Id number of this chain
     uint32_t version;       // Version of this teleport contract
+    vector<chainData> chains;       // Connected chains
 
     uint64_t primary_key() const { return symbol.raw(); }
   };
@@ -128,6 +137,14 @@ private:
    */
   uint64_t paymentsToOracles(stats_table::const_iterator stat);
 
+  /**
+   * @brief Check if id already exists
+   * 
+   * @param chain_id Identification number for a chain
+   * @param stat Iterator to the stats table entry
+   * @return true if it exists otherwise false
+   */
+  static bool hasId(uint8_t chain_id, stats_table::const_iterator stat);
 public:
   using contract::contract;
 
@@ -140,8 +157,27 @@ public:
    * @param fixfee Fix fee for teleports and receipts
    * @param varfee Variable fee for teleports and receipts
    * @param freeze Freeze all freezable actions
+   * @param threshold Amount of oracle validations until a receipt teleport is completed
+   * @param chain_id Self defined identification number of this chain
    */
-  ACTION ini(const asset min, const asset fixfee, const double varfee, const bool freeze, const uint32_t threshold);
+  ACTION ini(const asset min, const asset fixfee, const double varfee, const bool freeze, const uint32_t threshold, const uint8_t chain_id);
+
+  /**
+   * @brief Add a bridge to a new chain
+   * 
+   * @param name Name of the chain to bridge
+   * @param chain_id Identification number for this new chain
+   * @param net_id Unique network id to distinguish different chains. See "ChainID" for ethereum based chains on https://chainlist.org/ 
+   * @param contract Contract address
+   */
+  ACTION addchain(string name, uint8_t chain_id, string net_id, string contract);
+  
+  /**
+   * @brief Remove a bridge
+   * 
+   * @param chain_id Identification number for this new chain
+   */
+  ACTION rmchain(uint8_t chain_id);
 
   /* Fungible token transfer (only trilium) */
   [[eosio::on_notify(TOKEN_CONTRACT_STR "::transfer")]] void transfer(name from, name to, asset quantity, string memo);

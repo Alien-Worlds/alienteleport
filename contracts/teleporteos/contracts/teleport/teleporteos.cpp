@@ -6,7 +6,7 @@ teleporteos::teleporteos(name s, name code, datastream<const char *> ds)
   : contract(s, code, ds),
    _stats(get_self(), get_self().value) {}
 
-ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee, const bool freeze, const uint32_t threshold){
+ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee, const bool freeze, const uint32_t threshold, const uint8_t chain_id){
   require_auth(get_self());
 
   check(min.symbol == TOKEN_SYMBOL, "Wrong token symbol of min amount");
@@ -29,6 +29,7 @@ ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee
     s.oracles = 0;
     s.threshold = threshold;
     s.version = 1;
+    s.id = chain_id;
   });
 
   uint64_t fee = calc_fee(stat, min.amount);
@@ -83,6 +84,8 @@ ACTION teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checks
   check(deposit != _deposits.end(), "Deposit not found, please transfer the tokens first");
   check(deposit->quantity >= quantity, "Not enough deposited");
 
+  check(hasId(chain_id, stat), "This chain id is not available");
+
   // Reduce the deposit amount by the teleport amount and delete the deposit if it would be zero
   if (deposit->quantity == quantity) {
     _deposits.erase(deposit);
@@ -115,6 +118,45 @@ ACTION teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checks
       permission_level{get_self(), "active"_n}, get_self(), "logteleport"_n,
       make_tuple(next_teleport_id, now, from, quantity, chain_id, eth_address))
       .send();
+}
+
+bool teleporteos::hasId(uint8_t chain_id, stats_table::const_iterator stat){
+  for(auto itr = stat->chains.begin(); itr != stat->chains.end(); itr++){
+    if(itr->id == chain_id){
+      return true;
+    }
+  }
+  return false;
+}
+
+ACTION teleporteos::addchain(string name, uint8_t chain_id, string net_id, string contract){
+  require_auth(get_self());
+  auto stat = _stats.find(TOKEN_SYMBOL.raw());
+  check(!hasId(chain_id, stat), "This chain is already listed");
+
+  chainData chain;
+  chain.id = chain_id;
+  chain.name = name;
+  chain.net_id = net_id;
+  chain.contract = contract;
+
+  _stats.modify(*stat, get_self(), [&](auto &s) {
+    s.chains.push_back(chain);
+  });
+}
+
+ACTION teleporteos::rmchain(uint8_t chain_id){
+  require_auth(get_self());
+  auto stat = _stats.find(TOKEN_SYMBOL.raw());
+  
+  _stats.modify(*stat, get_self(), [&](auto &s) {
+    for(auto itr = stat->chains.begin(); itr != stat->chains.end(); itr++){
+      if(itr->id == chain_id){
+        s.chains.erase(itr);
+        break;
+      }
+    }
+  });
 }
 
 /* Cancels a teleport after 30 days and no claim */
@@ -189,6 +231,8 @@ ACTION teleporteos::received(name oracle_name, name to, checksum256 ref, asset q
 
   check(quantity.amount > 0, "Quantity cannot be negative");
   check(quantity.is_valid(), "Asset not valid");
+
+  check(hasId(chain_id, stat), "This chain id is not available");
 
   if (receipt == ref_ind.end()) {
     _receipts.emplace(get_self(), [&](auto &r) {

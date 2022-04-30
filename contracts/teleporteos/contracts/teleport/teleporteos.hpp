@@ -15,14 +15,17 @@ class [[eosio::contract("teleporteos")]] teleporteos : public contract {
 private:
 
   struct chainData{
-    uint8_t id;
-    string name;
-    string net_id;
-    string contract;
+    uint8_t id;             // Id to specify the chain
+    string name;            // Chain name
+    string abbreviation;    // Abbreviation of the chain name
+    string net_id;          // Id used in metamask
+    string teleaddr;        // Teleport contract address
+    string tokenaddr;       // Token contract address
   };
 
   struct [[eosio::table("stats")]] stats_item {
     symbol symbol;          // Symbol for the token
+    name tokencontr;     // Contract of the token
     uint64_t min;           // Minimum amount for token teleport
     uint64_t fixfee;        // Fix fee for teleports and receipts
     double varfee;          // Variable fee for teleports and receipts
@@ -166,11 +169,13 @@ public:
    * @brief Add a bridge to a new chain
    * 
    * @param name Name of the chain to bridge
+   * @param abbreviation Short name of the chain
    * @param chain_id Identification number for this new chain
    * @param net_id Unique network id to distinguish different chains. See "ChainID" for ethereum based chains on https://chainlist.org/ 
-   * @param contract Contract address
+   * @param teleaddr Teleport contract address
+   * @param tokenaddr Token contract address
    */
-  ACTION addchain(string name, uint8_t chain_id, string net_id, string contract);
+  ACTION addchain(string name, string abbreviation, uint8_t chain_id, string net_id, string teleaddr, string tokenaddr);
   
   /**
    * @brief Remove a bridge

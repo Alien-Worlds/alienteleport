@@ -21,16 +21,15 @@ ACTION ini(asset min, uint64_t fixfee, double varfee, bool freeze, uint32_t thre
 
 3. Add the ethereum chains which are allowed
 ```
-/**
-   * @brief Add a bridge to a new chain
-   * 
-   * @param name Name of the chain to bridge
-   * @param chain_id Identification number for this new chain
-   * @param net_id Unique network id to distinguish different chains. See "ChainID" for ethereum based chains on https://chainlist.org/ 
-   * @param contract Contract address
-   */
-  ACTION addchain(string name, uint8_t chain_id, string net_id, string contract);
+  ACTION addchain(string name, uint8_t chain_id, string teleaddr, string tokenaddr);
 ```
+- ***name*** Name of the chain to bridge
+- ***abbreviation*** Short name of the chain
+- ***chain_id*** Identification number for this new chain
+- ***net_id*** Unique network id to distinguish different chains. See "ChainID" for ethereum based chains on https://chainlist.org/ 
+- ***teleaddr*** Teleport contract address
+- ***tokenaddr*** Token contract address
+
 With the freeze action you can freeze and unfreeze specific parts of the contract
 ```
 ACTION freeze(const bool in, const bool out, const bool oracles, const bool cancel);

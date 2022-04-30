@@ -18,6 +18,7 @@ ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee
 
   auto stat = _stats.emplace(get_self(), [&](auto &s) {
     s.symbol = TOKEN_SYMBOL;
+    s.tokencontr = TOKEN_CONTRACT;
     s.min = min.amount;
     s.fixfee = 0;
     s.varfee = varfee;
@@ -129,7 +130,7 @@ bool teleporteos::hasId(uint8_t chain_id, stats_table::const_iterator stat){
   return false;
 }
 
-ACTION teleporteos::addchain(string name, uint8_t chain_id, string net_id, string contract){
+ACTION teleporteos::addchain(string name, string abbreviation, uint8_t chain_id, string net_id, string teleaddr, string tokenaddr){
   require_auth(get_self());
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
   check(!hasId(chain_id, stat), "This chain is already listed");
@@ -137,8 +138,10 @@ ACTION teleporteos::addchain(string name, uint8_t chain_id, string net_id, strin
   chainData chain;
   chain.id = chain_id;
   chain.name = name;
+  chain.abbreviation = abbreviation;
   chain.net_id = net_id;
-  chain.contract = contract;
+  chain.teleaddr = teleaddr;
+  chain.tokenaddr = tokenaddr;
 
   _stats.modify(*stat, get_self(), [&](auto &s) {
     s.chains.push_back(chain);

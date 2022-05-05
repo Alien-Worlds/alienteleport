@@ -57,27 +57,11 @@ class EosOracle{
     private eos_api: EosApi
     public running = false
     private irreversible_time = 0
-    // private current_block_time = 0
     static maxWait = 180    // The max amount of seconds to wait to check an entry again if it is irreversible now
 
     constructor(private config: ConfigType, private signatureProvider: JsSignatureProvider){
-        this.eos_api = new EosApi(this.config.eos.chainId, this.config.eos.endpoints, this.signatureProvider)
+        this.eos_api = new EosApi(this.config.eos.netId, this.config.eos.endpoints, this.signatureProvider)
     }
-    
-    // static async tryHard(tries: number, action : (tryNumber?: number) => Promise<boolean | any>, onCatch: (e?: any, tryNumber?: number) => boolean | undefined) {
-    //     let tryI = 0
-    //     let fin : any = false
-    //     do{
-    //         try{
-    //             fin = await action(tryI)
-    //             if(fin || typeof fin == 'number'){
-    //                 return fin
-    //             }
-    //         } catch (e){
-    //             fin = onCatch(e, tryI)? true : false
-    //         }
-    //     } while (!fin && tryI < tries)
-    // }
 
     /**
      * Send sign a teleport. Repeats itself until a defined amount of tries are reached 
@@ -168,27 +152,7 @@ class EosOracle{
         
         return teleport_res as GetTableRowsResult
     }
-    
-    // async function validateEntryByOtherEndpoints(id: number, logdata: Uint8Array, dataSize: number){
-    //     if(config.eos.epVerifications > eos_api.get_EndpointAmount()){
-    //         console.error('Not enough endpoints to verify data')
-    //         process.exit(1)
-    //     }
-    //     const lastEndpoint = eos_api.getEndpoint()
-    //     await eos_api.nextEndpoint()
-    //     for(let i = 1; i < config.eos.epVerifications; i++){
-    //         const entries = (await getTableEntries(id, 1, false)).rows as Array<string>
-    //         if(lastEndpoint == eos_api.getEndpoint()){
-    //             throw('No available endpoints for verification')
-    //         }
-    //         const veriData = fromHexString(entries[0]).slice(0, dataSize)
-    //         if(!arraysEqual(logdata, veriData)){
-    //             throw('Verification failed by' + eos_api.getEndpoint())
-    //         }
-    //         console.log(`Teleport id ${id} verified ${i + 1} times`)
-    //     }
-    // }
-                
+          
     /**
      * Serialize the table entry of a teleport 
      * @param teleport Parameters of a teleport table entry  
@@ -201,7 +165,7 @@ class EosOracle{
             textEncoder: new TextEncoder,
             textDecoder: new TextDecoder
         })
-        sb.pushNumberAsUint64(teleport.id) // TODO: use bigint
+        sb.pushNumberAsUint64(teleport.id)
         sb.pushUint32(teleport.time)
         sb.pushName(teleport.account)
         sb.pushAsset(teleport.quantity)
@@ -280,15 +244,6 @@ class EosOracle{
                 if(info.last_irreversible_block_time){
                     // Get last irreversible block time if available
                     irr_time = new Date(info.last_irreversible_block_time + 'Z').getTime()
-                    
-                    // // Check current time
-                    // let cur_time = new Date(info.head_block_time).getTime()
-                    // if(cur_time <= minIrrTime){
-                    //     throw(`Current time is lower than possible, occurred by using ${this.eos_api.getEndpoint()}`)
-                    // }
-                    // if(cur_time < minCurrentTimeMs){
-                    //     minCurrentTimeMs = cur_time
-                    // }
                 } else if (info.last_irreversible_block_num){
                     // Get last irreversible block time from last irreversible block
                     let irr_block = await this.eos_api.getRPC().get_block(info.last_irreversible_block_num)
@@ -324,7 +279,6 @@ class EosOracle{
         if(lowestIrr){
             this.irreversible_time = lowestIrr
         }
-        // this.current_block_time = minCurrentTimeMs
     }
 
     /**

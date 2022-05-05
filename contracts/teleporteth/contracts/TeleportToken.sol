@@ -234,7 +234,7 @@ contract TeleportToken is ERC20Interface, Owned, Oracled, Verify {
         _totalSupply = 10000000000 * 10**uint(decimals);
         balances[address(0)] = _totalSupply;
         threshold = 3;
-        thisChainId = 1;
+        thisChainId = 2;
     }
 
 

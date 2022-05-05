@@ -55,9 +55,9 @@ var eosjs_1 = require("eosjs");
 var cross_fetch_1 = __importDefault(require("cross-fetch"));
 var ethers_1 = require("ethers");
 var EosApi = /** @class */ (function () {
-    function EosApi(chainId, endpointList, signatureProvider, timeout) {
+    function EosApi(netId, endpointList, signatureProvider, timeout) {
         if (timeout === void 0) { timeout = 10000; }
-        this.chainId = chainId;
+        this.netId = netId;
         this.signatureProvider = signatureProvider;
         this.timeout = timeout;
         this.api = null;
@@ -133,7 +133,7 @@ var EosApi = /** @class */ (function () {
                         return [4 /*yield*/, this.getRPC().get_info()];
                     case 1:
                         _a.lastInfo = _c.sent();
-                        if (this.lastInfo.chain_id != this.chainId) {
+                        if (this.lastInfo.chain_id != this.netId) {
                             console.log('Delete endpoint because it uses another eosio chain', this.endpoint);
                             this.endpointList.splice(this.epId, 1);
                             this.gotRightInfo.splice(this.epId, 1);
@@ -181,9 +181,8 @@ var EosApi = /** @class */ (function () {
 }());
 exports.EosApi = EosApi;
 var EthApi = /** @class */ (function () {
-    function EthApi(chainId, endpointList, timeout) {
+    function EthApi(netIdStr, endpointList, timeout) {
         if (timeout === void 0) { timeout = 10000; }
-        this.chainId = chainId;
         this.timeout = timeout;
         this.epId = -1;
         this.providers = [];
@@ -191,8 +190,12 @@ var EthApi = /** @class */ (function () {
         this.endpoint = this.endpointList[0];
         this.lastInfo = null;
         this.gotRightInfo = [];
+        this.netId = undefined;
         if (endpointList.length <= 0) {
             throw ('No list of eth entpoints defined');
+        }
+        if (netIdStr) {
+            this.netId = Number(netIdStr);
         }
         this.gotRightInfo = Array(endpointList.length).fill(false);
         this.endpointList = endpointList.map(function (ep) {
@@ -217,7 +220,9 @@ var EthApi = /** @class */ (function () {
                         return [4 /*yield*/, this.providers[this.epId].getNetwork()];
                     case 1:
                         _a.lastInfo = _b.sent();
-                        if (this.lastInfo.chainId != this.chainId) {
+                        console.log('netId', this.netId);
+                        console.log('this.lastInfo.chainId', this.lastInfo.chainId);
+                        if (this.netId !== undefined && this.netId != this.lastInfo.chainId) {
                             console.log('Delete endpoint because it uses another eosio chain', this.endpoint);
                             this.endpointList.splice(this.epId, 1);
                             this.gotRightInfo.splice(this.epId, 1);

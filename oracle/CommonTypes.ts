@@ -6,7 +6,8 @@ export interface ConfigType {
     eos: {
         network: string,
         // wsEndpoint: string,
-        chainId: string,
+        netId: string,
+        id?: number,
         endpoint?: string,
         endpoints: Array<string>,
         teleportContract: string,
@@ -19,7 +20,8 @@ export interface ConfigType {
     eth: {
         network: string,
         // wsEndpoint: string,
-        chainId: number,
+        netId?: string,
+        id?: bigint | number | string,
         endpoint?: string,
         endpoints: Array<string>,
         teleportContract: string,
@@ -44,7 +46,7 @@ export interface TeleportTableEntry{
 
 export interface eosio_claim_data {
     oracle_name: string;
-    id: string;
+    id: number;
     to_eth: string;
     quantity: string;
 }
@@ -54,6 +56,6 @@ export interface eosio_teleport_data {
     to: string;
     ref: string;
     quantity: string;
-    chain_id: string;
+    chain_id: number;
     confirmed: boolean;
 }

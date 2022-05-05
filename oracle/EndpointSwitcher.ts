@@ -14,7 +14,7 @@ export class EosApi {
     private lastInfo: GetInfoResult | null = null
     private gotRightInfo: Array<boolean> = []
 
-    constructor(private chainId: string, endpointList: Array<string>, private signatureProvider: SignatureProvider, private timeout = 10000){
+    constructor(private netId: string, endpointList: Array<string>, private signatureProvider: SignatureProvider, private timeout = 10000){
         if(endpointList.length <= 0){
             throw('No list of eosio entpoints defined')
         }
@@ -61,7 +61,7 @@ export class EosApi {
     private async checkInfo() {
         try{
             this.lastInfo = await this.getRPC().get_info();
-            if(this.lastInfo.chain_id != this.chainId){
+            if(this.lastInfo.chain_id != this.netId){
                 console.log('Delete endpoint because it uses another eosio chain', this.endpoint)
                 this.endpointList.splice(this.epId, 1)
                 this.gotRightInfo.splice(this.epId, 1)
@@ -114,10 +114,13 @@ export class EthApi{
     private endpoint = this.endpointList[0]
     private lastInfo: ethers.providers.Network | null = null
     private gotRightInfo: Array<boolean> = []
-
-    constructor(private chainId: number, endpointList: Array<string>, private timeout = 10000){
+    private netId: undefined | number = undefined
+    constructor(netIdStr: string | undefined, endpointList: Array<string>, private timeout = 10000){
         if(endpointList.length <= 0){
             throw('No list of eth entpoints defined')
+        }
+        if(netIdStr){
+            this.netId = Number(netIdStr)
         }
         this.gotRightInfo = Array(endpointList.length).fill(false)
         this.endpointList = endpointList.map(ep => {
@@ -138,7 +141,10 @@ export class EthApi{
         try{
             this.lastInfo = await this.providers[this.epId].getNetwork()
 
-            if(this.lastInfo.chainId != this.chainId){
+            console.log('netId', this.netId);
+            console.log('this.lastInfo.chainId', this.lastInfo.chainId);
+            
+            if(this.netId !== undefined && this.netId != this.lastInfo.chainId){
                 console.log('Delete endpoint because it uses another eosio chain', this.endpoint)
                 this.endpointList.splice(this.epId, 1)
                 this.gotRightInfo.splice(this.epId, 1)

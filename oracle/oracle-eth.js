@@ -300,17 +300,17 @@ var EthOracle = /** @class */ (function () {
     EthOracle.prototype.sendTransaction = function (actions, trxBroadcast) {
         if (trxBroadcast === void 0) { trxBroadcast = true; }
         return __awaiter(this, void 0, void 0, function () {
-            var tries, eos_res, e_3;
+            var tries, eos_res, e_3, error, s;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         tries = 0;
                         _a.label = 1;
                     case 1:
-                        if (!(tries < this.minTrySend)) return [3 /*break*/, 10];
+                        if (!(tries < this.minTrySend)) return [3 /*break*/, 8];
                         _a.label = 2;
                     case 2:
-                        _a.trys.push([2, 4, , 9]);
+                        _a.trys.push([2, 4, , 7]);
                         return [4 /*yield*/, this.eos_api.getAPI().transact({ actions: actions }, {
                                 blocksBehind: 3,
                                 expireSeconds: 30,
@@ -321,22 +321,33 @@ var EthOracle = /** @class */ (function () {
                         return [2 /*return*/, eos_res];
                     case 4:
                         e_3 = _a.sent();
-                        if (!(e_3.message.indexOf('Already marked as claimed') > -1 || e_3.message.indexOf('Oracle has already approved') > -1 || e_3.message.indexOf('This teleport has already completed'))) return [3 /*break*/, 5];
-                        return [2 /*return*/, true];
-                    case 5:
-                        console.error("Error while sending to eosio chain with ".concat(this.eos_api.getEndpoint(), ": ").concat(e_3.message, " \u274C"));
+                        error = 'Unkwon error';
+                        if (e_3.message) {
+                            s = e_3.message.indexOf(':') + 1;
+                            if (s > 0 && s < e_3.message.length) {
+                                error = e_3.message.substring(s);
+                                console.log();
+                            }
+                            else {
+                                error = e_3.message;
+                            }
+                            // Check if the error appears because the transaction is already claimed or approved
+                            if (error.indexOf('Already marked as claimed') > -1 || error.indexOf('Oracle has already approved') > -1 || error.indexOf('This teleport has already completed') > -1) {
+                                return [2 /*return*/, true];
+                            }
+                        }
+                        console.error("Error while sending to eosio chain with ".concat(this.eos_api.getEndpoint(), ": ").concat(error, " \u274C"));
                         return [4 /*yield*/, this.eos_api.nextEndpoint()];
-                    case 6:
+                    case 5:
                         _a.sent();
                         return [4 /*yield*/, sleep(1000)];
-                    case 7:
+                    case 6:
                         _a.sent();
-                        _a.label = 8;
-                    case 8: return [3 /*break*/, 9];
-                    case 9:
+                        return [3 /*break*/, 7];
+                    case 7:
                         tries++;
                         return [3 /*break*/, 1];
-                    case 10: return [2 /*return*/, false];
+                    case 8: return [2 /*return*/, false];
                 }
             });
         });
@@ -609,7 +620,7 @@ var EthOracle = /** @class */ (function () {
                         _a.sent();
                         return [3 /*break*/, 19];
                     case 18:
-                        console.log("Current block ".concat(from_block, " latest block ").concat(latest_block, ". Not waiting..."));
+                        console.log("Latest block is ".concat(latest_block, ". Not waiting..."));
                         _a.label = 19;
                     case 19: return [3 /*break*/, 22];
                     case 20:

@@ -216,14 +216,25 @@ class EthOracle {
                 }) as TransactResult                
                 return eos_res
             } catch (e: any) {
-                // Check if the error appears because the transaction is already claimed or approved
-                if (e.message.indexOf('Already marked as claimed') > -1 || e.message.indexOf('Oracle has already approved') > -1 || e.message.indexOf('This teleport has already completed')) {
-                    return true
-                } else {
-                    console.error(`Error while sending to eosio chain with ${this.eos_api.getEndpoint()}: ${e.message} ❌`)
-                    await this.eos_api.nextEndpoint()
-                    await sleep(1000)
+                let error : string = 'Unkwon error'
+                if(e.message){
+                    // Get error message
+                    const s = e.message.indexOf(':') + 1
+                    if(s > 0 && s < e.message.length){
+                        error = e.message.substring(s)
+                        console.log();
+                    } else {
+                        error = e.message
+                    }
+                    // Check if the error appears because the transaction is already claimed or approved
+                    if (error.indexOf('Already marked as claimed') > -1 || error.indexOf('Oracle has already approved') > -1 || error.indexOf('This teleport has already completed') > -1) {
+                        return true
+                    }
                 }
+                
+                console.error(`Error while sending to eosio chain with ${this.eos_api.getEndpoint()}: ${error} ❌`)
+                await this.eos_api.nextEndpoint()
+                await sleep(1000)
             }
         }
         return false
@@ -412,7 +423,7 @@ class EthOracle {
                 if (latest_block - from_block <= 1000) {
                     await EthOracle.WaitWithAnimation(30, 'Wait for new blocks...')
                 } else {
-                    console.log(`Current block ${from_block} latest block ${latest_block}. Not waiting...`)
+                    console.log(`Latest block is ${latest_block}. Not waiting...`)
                 }
             } catch (e: any) {
                 console.error('⚡️ ' + e.message)

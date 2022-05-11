@@ -16,6 +16,14 @@ ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee
 
   check(_stats.find(TOKEN_SYMBOL.raw()) == _stats.end(), "Already initialized");
 
+  // Get the amount of oracles if this contract overrides an old contract 
+  oracles_table _oracles(get_self(), get_self().value);
+  auto oracle = _oracles.begin();
+  int oracleCount = 0;
+  while (oracle != _oracles.end()) {
+    oracleCount++;
+  }
+
   auto stat = _stats.emplace(get_self(), [&](auto &s) {
     s.symbol = TOKEN_SYMBOL;
     s.tokencontr = TOKEN_CONTRACT;
@@ -27,7 +35,7 @@ ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee
     s.fout = freeze;
     s.foracles = freeze;
     s.fcancel = freeze;
-    s.oracles = 0;
+    s.oracles = oracleCount;
     s.threshold = threshold;
     s.version = 1;
     s.id = chain_id;

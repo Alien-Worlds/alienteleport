@@ -1,7 +1,7 @@
 # New features
 - Optional fix and variable fees which fund the oracles
 - Freeze options for specific parts of the contract
-- Adjustable amount of needed oracle confirmations for a receiving teleport
+- Adjustable number of needed oracle confirmations for a receiving teleport
 - Adjustable minimum amount for deposits and teleports 
 - Option to delete old teleport and cancel entries without losing consensus 
 - Store all needed bridge data in stats table for interoperability with custom front end apps
@@ -14,12 +14,12 @@
 ACTION ini(asset min, uint64_t fixfee, double varfee, bool freeze, uint32_t threshold);
 ```
 - ***min*** Minimum amount for a deposit and teleport
-- ***fixfee*** Fix fee for teleports and receipts. Together with the variable fee (varfee) the resulting fee has to be less than minimum transfer amount (min).
+- ***fixfee*** Fix fee for teleports and receipts. Together with the variable fee (varfee) the resulting fee has to be less than the minimum transfer amount (min).
 - ***varfee*** Variable fee for teleports and receipts. This has to be between 0 and 0.20 which equals to 0% and 20%.
 - ***freeze*** True to freeze the contract until you unfreeze it with the freeze action.
 - ***threshold*** Amount of needed oracle confirmations for a receiving teleport
 
-3. Add the ethereum chains which are allowed
+3. Add the allowed ethereum chains 
 ```
   ACTION addchain(string name, uint8_t chain_id, string teleaddr, string tokenaddr);
 ```
@@ -43,11 +43,11 @@ ACTION freeze(const bool in, const bool out, const bool oracles, const bool canc
 
 Just deploy the contract over the old teleport contract account, run the ini action and add all connected chains by executing the addchain action.
 
-**Note:** In this upgrade are additional tables, the structure of the old tables is not changed.
+**Note:** Additional tables are included in this upgrade, the structure of the old tables is not changed.
 
 # Install test suite on windows
 
-You need to activate the windows feature Hyper-V, but it is not available on Windows 10 Home. So you might need to upgrade your Windows to Windows Pro.
+You need to activate the windows feature Hyper-V, but it is not available on Windows 10 Home. You might need to upgrade your Windows to Windows Pro.
 
 ## Activate WSL 2
 Start windows PowerShell as administrator and run the following commands
@@ -85,7 +85,7 @@ sudo yarn install
 ```
 
 ## Set up docker
-Install and start Docker, check for updates and install them. Open Dockers menu by double clicking the icon in the task bar and go to settings ⚙️.
+Install and start Docker, check for updates and install them. Open the Dockers menu by double clicking the icon in the task bar and go to settings ⚙️.
 
 Check "Use the WSL 2 based engine"
 

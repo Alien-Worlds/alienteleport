@@ -396,7 +396,7 @@ describe('teleporteos', async () => {
         )
       })
     })
-    context('wirth correct auth', async () => {
+    context('with correct auth', async () => {
       context('with non-existing receipt', async () => {
         it('should fail', async () => {
           await assertEOSErrorIncludesMessage(

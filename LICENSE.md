@@ -1,7 +1,7 @@
 The MIT License (MIT)
 =====================
 
-Copyright © `2020` `Dacoco GmbH`
+Copyright © `2022` `Kevin Kei Tuncer`
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation

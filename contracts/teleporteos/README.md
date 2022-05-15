@@ -6,6 +6,9 @@
 - Option to delete old teleport and cancel entries without losing consensus 
 - Store all needed bridge data in stats table for interoperability with custom front end apps
 
+# Note
+This version reduces the EOSIO RAM by half and therefore its running costs. Further reductions need breaking changes, therefore a second version will be provided by [SavAct](https://github.com/SavAct).
+
 # Deployment and initialization
 
 1. Deploy the contract
@@ -39,11 +42,33 @@ ACTION freeze(const bool in, const bool out, const bool oracles, const bool canc
 - ***oracles*** True to freeze oracles, false to unfreeze
 - ***cancel*** True to freeze cancel action, false to unfreeze
 
+Register oracles with regoracle
+- ***oracle_name*** EOSIO account name of the oracle
+```
+ACTION regoracle(name oracle_name);
+```
+
 ## Upgrade from running teleport contract of alien world
 
 Just deploy the contract over the old teleport contract account, run the ini action and add all connected chains by executing the addchain action.
 
 **Note:** Additional tables are included in this upgrade, the structure of the old tables is not changed.
+
+## Maintenance
+
+To pay off collected fees to the oracles run payoracles
+```
+ACTION payoracles();
+```
+
+Use delteles to free the EOSIO RAM of completed and canceled teleports
+***to_id*** Delete all entries until this id
+```
+ACTION delteles(uint64_t to_id);
+```
+
+**Note:** You can use the [SavAct WebApp](https://savact.app/#/_trx_/teleport/setup) in combination with the [Anchor Wallet by Greymass](https://greymass.com/en/anchor/) to execute these actions.
+
 
 # Install test suite on windows
 

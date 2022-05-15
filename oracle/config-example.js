@@ -1,24 +1,34 @@
 module.exports = {
-    precision: 4,
-    symbol: 'TLM',
-    confirmations: 2,
+    precision: 4,       // Token precision
+    symbol: 'TLM',      // Token symbol
+    confirmations: 3,   // Number of needed oracle confirmations per teleport
     eos: {
-        network: 'EOS',
-        chainId: "cf057bbfb72640471fd910bcb67639c22df9f92470936cddc1ade0e2f2e7dc4f",
+        network: 'EOS', // Abbreviation of the chain
+        id: 0,          // Id of this chain for this bridge
+        netId: "e70aaab8997e1dfce58fbfac80cbbb8fecec7b99cf982a9444273cbc64c41473", // EOSIO identification for different chains
         endpoints: [
-            'https://jungle.eosphere.io:443', 'http://jungle2.cryptolions.io:80', 'http://jungle2.cryptolions.io:8888', 
+            'https://jungle.eosphere.io:443', 
+            'http://jungle2.cryptolions.io:80', 
+            'http://jungle2.cryptolions.io:8888',
         ],
-        epVerifications: 2,
-        teleportContract: 'eosiotestacc',
-        oracleAccount: 'anneliese',
-        privateKey: '5K29JmEvWEnfdD5DV1bm9Ro4qMrTKhBGmTXuaaqmrZSMEntqqZQ'
-        
+        epVerifications: 2, // Verify data by this number of endpoints
+        teleportContract: 'alein.worlds',   // EOSIO token contract account
+        oracleAccount: 'oracle1',   // EOSIO oracle account
+        privateKey: '5K29JmEvWEnfdD5DV1bm9Ro4qMrTKhBGmTXuaaqmrZSMEntqqZQ', // Example private EOSIO key. Do not use it. It is public!
     },
     eth: {
-        network: 'BSC',
-        endpoint: 'http://localhost:8545/',
-        teleportContract: '0x0789a30aa30d6a7a7536a7ed26956bbdb0fc80bd',
-        oracleAccount: '0x111111111111111111111111111111111111111',
-        privateKey: '2a6bdd74caefd68f16f7ee06ad37c922502c9b081f2fa26a69a1c57cd0c118a2'
+        network: 'BSC', // Abbreviation of the chain
+        id: 2,          // Id of this chain for this bridge
+        netId: '97',    // Id of this chain defined on chailist.org 
+        endpoints: [
+            'https://data-seed-prebsc-1-s1.binance.org:8545', 
+            'https://data-seed-prebsc-2-s2.binance.org:8545', 
+            'https://data-seed-prebsc-1-s2.binance.org:8545',
+        ],
+        genesisBlock: 19024616, // Initial block to start from
+        epVerifications: 2, // Verify data by this number of endpoints
+        teleportContract: '0x281D131268f5D257297DDDe4B4047EeF881db79d', // ETH teleport contract address
+        oracleAccount: '0x8353C7d4758D113Dd4407AC4b1115fF2E54D9eA0',
+        privateKey: '8940fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378100', // Example private ETH key. Do not use it. It is public!
     }
 }

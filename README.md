@@ -4,8 +4,8 @@ Contracts and tools to create a bridge between WAX tokens and an ERC-20 counterp
 
 ## Contracts
 
-There are contracts available for both EOSIO chains and Ethereum, both should be deployed 
-on their respective chains.
+There are contracts available for both EOSIO chains and Ethereum, both should be deployed on their respective chains.
+After deploying the EOSIO contract call the `ini` function to initialize it. Each ETH chain must be registered on the EOSIO contract with the `addchain` function.
 
 ## Process
 
@@ -17,7 +17,7 @@ Transferring from ETH -> EOSIO simply requires callint the `teleport` function o
 You can use the SavAct WebApp as frontend by entering your EOSIO contract and network. For direct selection add your settings to the URL 
 [https://savact.app/#/_trx_/teleport?bridge=**other.worlds**&eosio=**WAX**&eth=**BSC**](https://savact.app/#/_trx_/teleport?bridge=other.worlds&eosio=WAX&eth=BSC)
 
-The App is only compatible with the EOSIO teleport contract of version 1 and higher. For more information see its [README.md](./contract/README.md)
+The app is only compatible with the EOSIO teleport contract of version 1 and higher. For more information see its [README.md](./contracts/teleporteos/README.md)
 
 To add your teleport in a select box of the SavAct WebApp, feel free to request the admins of https://t.me/SavActGroup
 

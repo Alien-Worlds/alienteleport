@@ -11,9 +11,9 @@ module.exports = {
             'http://jungle2.cryptolions.io:80', 
             'http://jungle2.cryptolions.io:8888',
         ],
-        epVerifications: 2, // Verify data by this number of endpoints
+        epVerifications: 2,                 // Verify data by this number of endpoints
         teleportContract: 'alein.worlds',   // EOSIO token contract account
-        oracleAccount: 'oracle1',   // EOSIO oracle account
+        oracleAccount: 'oracle1',           // EOSIO oracle account
         privateKey: '5K29JmEvWEnfdD5DV1bm9Ro4qMrTKhBGmTXuaaqmrZSMEntqqZQ', // Example private EOSIO key. Do not use it. It is public!
     },
     eth: {
@@ -26,9 +26,9 @@ module.exports = {
             'https://data-seed-prebsc-1-s2.binance.org:8545',
         ],
         genesisBlock: 19024616, // Initial block to start from
-        epVerifications: 2, // Verify data by this number of endpoints
+        epVerifications: 2,     // Verify data by this number of endpoints
         teleportContract: '0x281D131268f5D257297DDDe4B4047EeF881db79d', // ETH teleport contract address
-        oracleAccount: '0x8353C7d4758D113Dd4407AC4b1115fF2E54D9eA0',
+        oracleAccount: '0x8353C7d4758D113Dd4407AC4b1115fF2E54D9eA0',    // ETH oracle address
         privateKey: '8940fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378100', // Example private ETH key. Do not use it. It is public!
     }
 }

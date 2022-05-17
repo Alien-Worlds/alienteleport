@@ -97,12 +97,15 @@ describe('teleporteos', async () => {
       })
       it('should update stats table', async () => {
         const { rows: [item] } = await teleporteos.statsTable()
+        console.log(item.chains);
+        
         chai.expect(item.chains.length).equal(1, 'Wrong amount of added chains')
-        chai.expect(item.chains[0].name).equal(ethName, 'Wrong chain name')
-        chai.expect(item.chains[0].id).equal(ethId, 'Wrong chain id')
-        chai.expect(item.chains[0].net_id).equal(ethNetId, 'Wrong chain name')
-        chai.expect(item.chains[0].teleaddr).equal(ethContract, 'Wrong chain id')
-        chai.expect(item.chains[0].tokenaddr).equal(ethTokenContract, 'Wrong chain id')
+        const chain = item.chains[0] as unknown as {key: number, value: {name: string, net_id: string, teleaddr: string, tokenaddr: string}}
+        chai.expect(chain.key).equal(ethId, 'Wrong chain id' + ' got: ' + String(item.chains[0]))
+        chai.expect(chain.value.name).equal(ethName, 'Wrong chain name')
+        chai.expect(chain.value.net_id).equal(ethNetId, 'Wrong chain name')
+        chai.expect(chain.value.teleaddr).equal(ethContract, 'Wrong chain id')
+        chai.expect(chain.value.tokenaddr).equal(ethTokenContract, 'Wrong chain id')
       })
       it('should fail with already existing id', async () => {
         await assertEOSErrorIncludesMessage(

@@ -128,13 +128,9 @@ ACTION teleporteos::teleport(name from, asset quantity, uint8_t chain_id, checks
       .send();
 }
 
-bool teleporteos::hasId(uint8_t chain_id, stats_table::const_iterator stat){
-  for(auto itr = stat->chains.begin(); itr != stat->chains.end(); itr++){
-    if(itr->id == chain_id){
-      return true;
-    }
-  }
-  return false;
+inline bool teleporteos::hasId(uint8_t chain_id, stats_table::const_iterator stat){
+  auto itr = stat->chains.find(chain_id);
+  return itr != stat->chains.end();
 }
 
 ACTION teleporteos::addchain(string name, string abbreviation, uint8_t chain_id, string net_id, string teleaddr, string tokenaddr){
@@ -143,16 +139,17 @@ ACTION teleporteos::addchain(string name, string abbreviation, uint8_t chain_id,
   check(!hasId(chain_id, stat), "This chain is already listed");
 
   chainData chain;
-  chain.id = chain_id;
   chain.name = name;
   chain.abbreviation = abbreviation;
   chain.net_id = net_id;
   chain.teleaddr = teleaddr;
   chain.tokenaddr = tokenaddr;
 
+  std::pair<map<uint8_t,chainData>::iterator,bool> ret;
   _stats.modify(*stat, get_self(), [&](auto &s) {
-    s.chains.push_back(chain);
+    ret = s.chains.insert(std::pair<uint8_t,chainData>(chain_id, chain));
   });
+  check(ret.second != false, "Chain was already added");
 }
 
 ACTION teleporteos::rmchain(uint8_t chain_id){
@@ -160,12 +157,7 @@ ACTION teleporteos::rmchain(uint8_t chain_id){
   auto stat = _stats.find(TOKEN_SYMBOL.raw());
   
   _stats.modify(*stat, get_self(), [&](auto &s) {
-    for(auto itr = stat->chains.begin(); itr != stat->chains.end(); itr++){
-      if(itr->id == chain_id){
-        s.chains.erase(itr);
-        break;
-      }
-    }
+    s.chains.erase(chain_id);
   });
 }
 
@@ -215,8 +207,7 @@ ACTION teleporteos::sign(name oracle_name, uint64_t id, string signature) {
   auto teleport = _teleports.find(id);
   check(teleport != _teleports.end(), "Teleport not found");
 
-  auto find_res = std::find(teleport->oracles.begin(), teleport->oracles.end(),
-                            oracle_name);
+  auto find_res = std::find(teleport->oracles.begin(), teleport->oracles.end(), oracle_name);
   check(find_res == teleport->oracles.end(), "Oracle has already signed");
 
   for(auto &sig : teleport->signatures){

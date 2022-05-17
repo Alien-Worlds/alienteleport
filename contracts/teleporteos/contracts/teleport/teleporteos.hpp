@@ -2,6 +2,7 @@
 #include <eosio/eosio.hpp>
 #include <eosio/transaction.hpp>
 #include <math.h>
+#include <map>
 
 using namespace eosio;
 using namespace std;
@@ -15,7 +16,6 @@ class [[eosio::contract("teleporteos")]] teleporteos : public contract {
 private:
 
   struct chainData{
-    uint8_t id;             // Id to specify the chain
     string name;            // Chain name
     string abbreviation;    // Abbreviation of the chain name
     string net_id;          // Id used in metamask
@@ -25,7 +25,7 @@ private:
 
   struct [[eosio::table("stats")]] stats_item {
     symbol symbol;          // Symbol for the token
-    name tokencontr;     // Contract of the token
+    name tokencontr;        // Contract of the token
     uint64_t min;           // Minimum amount for token teleport
     uint64_t fixfee;        // Fix fee for teleports and receipts
     double varfee;          // Variable fee for teleports and receipts
@@ -38,7 +38,7 @@ private:
     bool fcancel;           // Freeze cancel action
     uint8_t id;             // Id number of this chain
     uint32_t version;       // Version of this teleport contract
-    vector<chainData> chains;       // Connected chains
+    map<uint8_t, chainData> chains;    // Connected chains. The key is the self defined chain specific chain id
 
     uint64_t primary_key() const { return symbol.raw(); }
   };
@@ -147,7 +147,7 @@ private:
    * @param stat Iterator to the stats table entry
    * @return true if it exists otherwise false
    */
-  static bool hasId(uint8_t chain_id, stats_table::const_iterator stat);
+  inline static bool hasId(uint8_t chain_id, stats_table::const_iterator stat);
 public:
   using contract::contract;
 
@@ -256,5 +256,14 @@ public:
    * @brief Pay out the collected fees to the oracles. Everyone can run this action
    */
   ACTION payoracles();
+
+  // // Should never execute
+  // ACTION delstats(){
+  //   require_auth(get_self());
+  //   auto stat = _stats.begin();
+  //   while (stat != _stats.end()) {
+  //     stat = _stats.erase(stat);
+  //   }
+  // }
 };
 } // namespace alienworlds

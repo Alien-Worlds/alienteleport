@@ -11,6 +11,7 @@ This version reduces the EOSIO RAM by half and therefore its running costs. Furt
 
 # Deployment and initialization
 
+0. The EOSIO account of the contract needs the `eosio.code` permission activated.
 1. Deploy the contract
 2. Run the ini action of the contract with the following parameters
 ```

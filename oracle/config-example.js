@@ -18,7 +18,7 @@ module.exports = {
     },
     eth: {
         network: 'BSC', // Abbreviation of the chain
-        id: 2,          // Id of this chain for this bridge
+        id: 2,          // Id of this chain for this bridge. Let it undefined to store the EOSIO recipient chain id on the recipient chain like the old way
         netId: '97',    // Id of this chain defined on chailist.org 
         endpoints: [
             'https://data-seed-prebsc-1-s1.binance.org:8545', 

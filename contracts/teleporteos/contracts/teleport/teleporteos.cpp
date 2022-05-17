@@ -45,7 +45,7 @@ ACTION teleporteos::ini(const asset min, const asset fixfee, const double varfee
 }
 
 /* Notifications for token transfer */
-ACTION teleporteos::transfer(name from, name to, asset quantity, string memo) {
+void teleporteos::transfer(name from, name to, asset quantity, string memo) {
   if (to == get_self() && TOKEN_SYMBOL == quantity.symbol) {
     auto stat = _stats.find(TOKEN_SYMBOL.raw());
     check(quantity.amount >= stat->min, "Transfer is below minimum token amount");

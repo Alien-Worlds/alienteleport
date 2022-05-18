@@ -16,7 +16,7 @@ import {
 } from 'lamington'
 import * as chai from 'chai'
 
-import { Teleporteos } from './teleporteos'
+import { Teleporteos, TeleporteosStatsItem } from './teleporteos'
 import { EosioToken } from '../eosio.token/eosio.token'
 
 const ethToken = '2222222222222222222222222222222222222222222222222222222222222222'
@@ -96,9 +96,7 @@ describe('teleporteos', async () => {
         await teleporteos.addchain(ethName, ethShortName, ethId, ethNetId, ethContract, ethTokenContract, { from: teleporteos.account })
       })
       it('should update stats table', async () => {
-        const { rows: [item] } = await teleporteos.statsTable()
-        console.log(item.chains);
-        
+        const { rows: [item] } = await teleporteos.statsTable()        
         chai.expect(item.chains.length).equal(1, 'Wrong amount of added chains')
         const chain = item.chains[0] as unknown as {key: number, value: {name: string, net_id: string, teleaddr: string, tokenaddr: string}}
         chai.expect(chain.key).equal(ethId, 'Wrong chain id' + ' got: ' + String(item.chains[0]))
@@ -630,17 +628,19 @@ describe('teleporteos', async () => {
           )
         })
       })
-      it('should succeed', async () => {
-        await teleporteos.claimed(oracle1.name, 0, ethToken, `123.0000 ${token_symbol}`, { from: oracle1 })
-        const { rows: [item] } = await teleporteos.teleportsTable({lowerBound: '0'})
-        chai.expect(item.id).equal(0, 'Wrong id')
-        chai.expect(item.claimed).equal(true)
-      })
-      it('should refuse double claiming', async () => {
-        await assertEOSErrorIncludesMessage(
-          teleporteos.claimed(oracle1.name, 0, ethToken, `123.0000 ${token_symbol}`, { from: oracle1 }),
-          'Already marked as claimed'
-        )
+      context('correct parameters', async () => {
+        it('should succeed', async () => {
+          await teleporteos.claimed(oracle1.name, 0, ethToken, `123.0000 ${token_symbol}`, { from: oracle1 })
+          const { rows: [item] } = await teleporteos.teleportsTable({lowerBound: '0'})
+          chai.expect(item.id).equal(0, 'Wrong id')
+          chai.expect(item.claimed).equal(true)
+        })
+        it('should refuse double claiming', async () => {
+          await assertEOSErrorIncludesMessage(
+            teleporteos.claimed(oracle1.name, 0, ethToken, `123.0000 ${token_symbol}`, { from: oracle1 }),
+            'Already marked as claimed'
+          )
+        })
       })
     })
   })
@@ -678,11 +678,12 @@ describe('teleporteos', async () => {
   })
 
   // Adjust fee
+  const fixfee = BigInt(1102)
   context('adjust fee', async () => {
     context('with incorrect auth', async () => {
       it('should fail with auth error', async () => {
         await assertMissingAuthority(
-          teleporteos.setfee(`0.1000 ${token_symbol}`, '0.003', { from: sender1 })
+          teleporteos.setfee(amountToAsset(fixfee, token_symbol, 4), '0.007', { from: sender1 })
         )
       })
     })
@@ -710,122 +711,135 @@ describe('teleporteos', async () => {
         })
         it('wrong symbol precision should fail', async () => {
           await assertEOSErrorIncludesMessage(
-            teleporteos.setfee(`1 ${token_symbol}`, '0.003', { from: teleporteos.account }),
+            teleporteos.setfee(`1 ${token_symbol}`, '0.007', { from: teleporteos.account }),
             'Wrong token'
           )
         })
         it('too high amount should fail', async () => {
           await assertEOSErrorIncludesMessage(
-            teleporteos.setfee(`200.0000 ${token_symbol}`, '0.003', { from: teleporteos.account }),
+            teleporteos.setfee(`200.0000 ${token_symbol}`, '0.007', { from: teleporteos.account }),
             'Fees are too high relative to the minimum amount of token transfers'
           )
         })  
       })
-      it('should succeed', async () => {
-        await teleporteos.setfee(`0.1000 ${token_symbol}`, '0.003', { from: teleporteos.account })
-      })
-      it('should update stats table', async () => {
-        let { rows: [item] } = await teleporteos.statsTable()
-        chai.expect(item.fixfee).equal(1000, 'Wrong fix fee')
-        chai.expect(item.varfee).equal('0.00300000000000000', 'Wrong variable fee')
-      })
-      it('should succeed withdraw and deposit', async () => {
-        await teleporteos.withdraw(sender1.name, `1.0000 ${token_symbol}`, { from: sender1 })
-        {
-          let { rows } = await teleporteos.depositsTable()
-          for(let item of rows){
+      context('with valid fees', async () => {
+        it('should succeed', async () => {
+          await teleporteos.setfee(amountToAsset(fixfee, token_symbol, 4), '0.007', { from: teleporteos.account })
+        })
+        it('should update stats table', async () => {
+          let { rows: [item] } = await teleporteos.statsTable()
+          chai.expect(BigInt(item.fixfee)).equal(fixfee, 'Wrong fix fee')
+          chai.expect(item.varfee).equal('0.00700000000000000', 'Wrong variable fee')
+        })
+        it('should succeed withdraw and deposit', async () => {
+          await teleporteos.withdraw(sender1.name, `1.0000 ${token_symbol}`, { from: sender1 })
+          {
+            let { rows } = await teleporteos.depositsTable()
+            for(let item of rows){
+              if(item.account == sender1.name){
+                chai.expect(item.quantity).equal(`100.0000 ${token_symbol}`, 'Wrong deposit on withdraw')
+                break
+              }
+            }
+          }
+          let { rows: [item_balance] } = await alienworldsToken.accountsTable({scope: sender1.name})
+          chai.expect(item_balance.balance).equal(`999900.0000 ${token_symbol}`, 'Wrong balance after withdraw')
+          await alienworldsToken.transfer(
+            sender1.name,
+            teleporteos.account.name,
+            `200.0000 ${token_symbol}`,
+            'teleport test',
+            { from: sender1 }
+          )
+          let deposits = await teleporteos.depositsTable()
+          for(let item of deposits.rows){
             if(item.account == sender1.name){
-              chai.expect(item.quantity).equal(`100.0000 ${token_symbol}`, 'Wrong deposit on withdraw')
+              chai.expect(item.quantity).equal(`300.0000 ${token_symbol}`, 'Wrong balance on deposit')
               break
             }
           }
-        }
-        let { rows: [item_balance] } = await alienworldsToken.accountsTable({scope: sender1.name})
-        chai.expect(item_balance.balance).equal(`999900.0000 ${token_symbol}`, 'Wrong balance after withdraw')
-        await alienworldsToken.transfer(
-          sender1.name,
-          teleporteos.account.name,
-          `200.0000 ${token_symbol}`,
-          'teleport test',
-          { from: sender1 }
-        )
-        let deposits = await teleporteos.depositsTable()
-        for(let item of deposits.rows){
-          if(item.account == sender1.name){
-            chai.expect(item.quantity).equal(`300.0000 ${token_symbol}`, 'Wrong balance on deposit')
-            break
-          }
-        }
-      })
-      it('should succeed teleport', async () => {
-        await teleporteos.teleport(sender1.name, `200.0000 ${token_symbol}`, 2, ethToken, { from: sender1 })
-        let deposits = await teleporteos.depositsTable()
-        for(let item of deposits.rows){
-          if(item.account == sender1.name){
-            chai.expect(item.quantity).equal(`100.0000 ${token_symbol}`, 'Wrong balance on deposit')
-            break
-          }
-        }
-        // Check collected amount
-        const value = BigInt(2000000)
-        const fee = calcFee(value, BigInt(1000), 0.003)
-        let { rows: [stat] } = await teleporteos.statsTable()
-        chai.expect(stat.collected.toString()).equal(fee.toString(), "Wrong collected fee amount")
-        // check teleport amount 
-        let teleports = await teleporteos.teleportsTable({reverse: true})
-        chai.expect(teleports.rows[0].quantity).equal(amountToAsset(value - fee, token_symbol, 4), "Wrong fee calculation")
-      })
-      it('should succeed receipt', async () => {
-        // Get current balance of sender 1 on token contract
-        let { rows: [a_item_old] } = await alienworldsToken.accountsTable({scope: sender1.name})
-        let sender1Balance = stringToAsset(a_item_old.balance).amount
-        // Get current balance of sender 1 on deposits
-        let sender1DepositBalance = BigInt(0)
-        let deposits_old = await teleporteos.depositsTable()
-        for(let item of deposits_old.rows){
-          if(item.account == sender1.name){
-            sender1DepositBalance = stringToAsset(item.quantity).amount
-            break
-          }
-        }
-        // Get current stat
-        let { rows: [stat_old] } = await teleporteos.statsTable()
-        // Send received action by three oracles, so it should be completed
-        const hash = '1111111111111111111111111111111111111111111111111111111111111113'
-        const sendAmount = BigInt(1230)
-        const sendAsset = amountToAsset(sendAmount, token_symbol, 4)
-        // Execute recepits with three oracles
-        await teleporteos.received(
-          oracle1.name, sender1.name, hash, sendAsset, 2, true, { from: oracle1 }
-        )
-        await teleporteos.received(
-          oracle2.name, sender1.name, hash, sendAsset, 2, true, { from: oracle2 }
-        )
-        await teleporteos.received(
-          oracle3.name, sender1.name, hash, sendAsset, 2, true, { from: oracle3 }
-        )
-        let { rows: [confirmedItem] } = await teleporteos.receiptsTable({
-          keyType: 'sha256', 
-          indexPosition: 2, 
-          lowerBound: hash
         })
-        chai.expect(confirmedItem.confirmations).equal(3, "Wrong amount of confirmations")
-        chai.expect(confirmedItem.completed).equal(true, "Not completed") 
-        // Check collected
-        const fee = calcFee(sendAmount, BigInt(1000), 0.003)
-        let { rows: [stat_new] } = await teleporteos.statsTable()
-        chai.expect(stat_new.collected.toString()).equal((BigInt(stat_old.collected) + fee).toString(), "Collected got wrong amount of fees")
-        // Check new balance on token contract
-        let { rows: [a_item_new] } = await alienworldsToken.accountsTable({scope: sender1.name})
-        chai.expect(stringToAsset(a_item_new.balance).amount.toString()).equal((sender1Balance + sendAmount - fee).toString(), "New Balance reduced by a fee is wrong")
-        // Check if deposit table is unchanged
-        let deposits_new = await teleporteos.depositsTable()
-        for(let item of deposits_new.rows){
-          if(item.account == sender1.name){
-            chai.expect(stringToAsset(item.quantity).amount.toString()).equal(sender1DepositBalance.toString(), "Deposit has changed")
-            break
+        it('should succeed teleport', async () => {
+          await teleporteos.teleport(sender1.name, `200.0000 ${token_symbol}`, 2, ethToken, { from: sender1 })
+        })
+        it('should have listed last teleport in table', async () => {
+          let deposits = await teleporteos.depositsTable()
+          for(let item of deposits.rows){
+            if(item.account == sender1.name){
+              chai.expect(item.quantity).equal(`100.0000 ${token_symbol}`, 'Wrong balance on deposit')
+              break
+            }
           }
-        }
+          // Check collected amount
+          const value = BigInt(2000000)
+          const fee = calcFee(value, fixfee, 0.007)
+          let { rows: [stat] } = await teleporteos.statsTable()
+          chai.expect(stat.collected.toString()).equal(fee.toString(), "Wrong collected fee amount")
+          // Check teleport amount 
+          let teleports = await teleporteos.teleportsTable({reverse: true})
+          chai.expect(teleports.rows[0].quantity).equal(amountToAsset(value - fee, token_symbol, 4), "Wrong fee calculation")
+        })
+        context('valid received until confirmation', async () => {
+          let sender1Balance: bigint;
+          let sender1DepositBalance: bigint;
+          let oldStat: TeleporteosStatsItem
+          const hash = '1111111111111111111111111111111111111111111111111111111111111113'
+          const sendAmount = BigInt(1230)
+          const sendAsset = amountToAsset(sendAmount, token_symbol, 4)
+          before(async () => {
+            // Get current balance of sender 1 on token contract
+            let { rows: [a_item_old] } = await alienworldsToken.accountsTable({scope: sender1.name})
+            sender1Balance = stringToAsset(a_item_old.balance).amount
+            // Get current balance of sender 1 on deposits
+            sender1DepositBalance = BigInt(0)
+            let deposits_old = await teleporteos.depositsTable()
+            for(let item of deposits_old.rows){
+              if(item.account == sender1.name){
+                sender1DepositBalance = stringToAsset(item.quantity).amount
+                break
+              }
+            }
+            // Get current stat
+            let stats = await teleporteos.statsTable()
+            oldStat = stats.rows[0] 
+          })
+          it('should succeed', async () => {
+            // Send received action by three oracles, so it should be completed
+            await teleporteos.received(
+              oracle1.name, sender1.name, hash, sendAsset, 2, true, { from: oracle1 }
+            )
+            await teleporteos.received(
+              oracle2.name, sender1.name, hash, sendAsset, 2, true, { from: oracle2 }
+            )
+            await teleporteos.received(
+              oracle3.name, sender1.name, hash, sendAsset, 2, true, { from: oracle3 }
+            )
+          })
+          it('should have expected table entries', async () => {
+            let { rows: [confirmedItem] } = await teleporteos.receiptsTable({
+              keyType: 'sha256', 
+              indexPosition: 2, 
+              lowerBound: hash
+            })
+            chai.expect(confirmedItem.confirmations).equal(3, "Wrong amount of confirmations")
+            chai.expect(confirmedItem.completed).equal(true, "Not completed") 
+            // Check collected
+            const fee = calcFee(sendAmount, fixfee, 0.007)
+            let { rows: [stat_new] } = await teleporteos.statsTable()
+            chai.expect(stat_new.collected.toString()).equal((BigInt(oldStat.collected) + fee).toString(), "Collected got wrong amount of fees")
+            // Check new balance on token contract
+            let { rows: [a_item_new] } = await alienworldsToken.accountsTable({scope: sender1.name})
+            chai.expect(stringToAsset(a_item_new.balance).amount.toString()).equal((sender1Balance + sendAmount - fee).toString(), "New Balance reduced by a fee is wrong")
+            // Check if deposit table is unchanged
+            let deposits_new = await teleporteos.depositsTable()
+            for(let item of deposits_new.rows){
+              if(item.account == sender1.name){
+                chai.expect(stringToAsset(item.quantity).amount.toString()).equal(sender1DepositBalance.toString(), "Deposit has changed")
+                break
+              }
+            }
+          })
+        })
       })
     })
   })
@@ -840,20 +854,18 @@ describe('teleporteos', async () => {
       })
     })
     context('with correct auth', async () => {
-      context('incorrect amount', async () => {
-        it('should fail', async () => {
-          await assertEOSErrorIncludesMessage(
-            teleporteos.setthreshold(0, { from: teleporteos.account }),
-            'Needed confirmation amount has to be grater than 0'
-          )
-        })
+      it('and incorrect amount should fail', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.setthreshold(0, { from: teleporteos.account }),
+          'Needed confirmation amount has to be grater than 0'
+        )
       })
       it('should succeed receipt', async () => {
         // Set threshold to 2
         await teleporteos.setthreshold(2, { from: teleporteos.account })
         // Check stats
         let { rows: [stat] } = await teleporteos.statsTable()
-        chai.expect(stat.threshold).equal(2, "Threshold was not was not inherited")
+        chai.expect(stat.threshold).equal(2, "Threshold was not inherited")
         // Send received action by three oracles, so it should be completed
         const hash = '1111111111111111111111111111111111111111111111111111111111111114'
         const sendAmount = BigInt(10000)
@@ -892,30 +904,26 @@ describe('teleporteos', async () => {
 
   // Delete teleports
   context('delete teleports', async () => {
-    context('with incorrect auth', async () => {
-      it('should fail with auth error', async () => {
-        await assertMissingAuthority(
-          teleporteos.delteles('0', { from: sender1 })
-        )
-        await assertMissingAuthority(
-          teleporteos.delteles('0', { from: oracle1 })
-        )
-      })
+    it('with incorrect auth should fail with auth error', async () => {
+      await assertMissingAuthority(
+        teleporteos.delteles('0', { from: sender1 })
+      )
+      await assertMissingAuthority(
+        teleporteos.delteles('0', { from: oracle1 })
+      )
     })
-    context('with not available id', async () => {
-      it('should fail', async () => {
-        await assertEOSErrorIncludesMessage(
-          teleporteos.delteles('100', { from: teleporteos.account }), 
-          'Teleport id not found'
-        )
-      })
+    it('with not available id should fail', async () => {
+      await assertEOSErrorIncludesMessage(
+        teleporteos.delteles('100', { from: teleporteos.account }), 
+        'Teleport id not found'
+      )
     })
     it('preparation', async () => {
       // Add three teleports
       await teleporteos.teleport(alienworldsToken.account.name, `203.0000 ${token_symbol}`, 1, ethToken, { from: alienworldsToken.account })
       await teleporteos.teleport(alienworldsToken.account.name, `203.0000 ${token_symbol}`, 2, ethToken, { from: alienworldsToken.account })
       await teleporteos.teleport(alienworldsToken.account.name, `203.0000 ${token_symbol}`, 3, ethToken, { from: alienworldsToken.account })
-      const fee = calcFee(BigInt(2030000), BigInt(1000), 0.003)
+      const fee = calcFee(BigInt(2030000), fixfee, 0.007)
       const sendAsset = amountToAsset(BigInt(2030000) - fee, token_symbol, 4)
       // Claim all teleports but not the second in table 
       await teleporteos.claimed(oracle1.name, 2, ethToken, sendAsset, { from: oracle1 })
@@ -925,14 +933,14 @@ describe('teleporteos', async () => {
     context('with correct auth', async () => {
       context('delete to id 2', async () => {
         it('should succeed', async () => {
-            // Delete until the third one
-            await teleporteos.delteles('2', { from: teleporteos.account })
-            const teleports = await teleporteos.teleportsTable()
-            chai.expect(teleports.rows.length).equal(4, 'Wrong amount of teleports are deleted')
-            chai.expect(teleports.rows[0].id).equal(1, 'Wrong deletion')
-            chai.expect(teleports.rows[1].id).equal(2, 'Wrong deletion')
-            chai.expect(teleports.rows[2].id).equal(3, 'Wrong deletion')
-            chai.expect(teleports.rows[3].id).equal(4, 'Wrong deletion')
+          // Delete until the third one
+          await teleporteos.delteles('2', { from: teleporteos.account })
+          const teleports = await teleporteos.teleportsTable()
+          chai.expect(teleports.rows.length).equal(4, 'Wrong amount of teleports are deleted')
+          chai.expect(teleports.rows[0].id).equal(1, 'Wrong deletion')
+          chai.expect(teleports.rows[1].id).equal(2, 'Wrong deletion')
+          chai.expect(teleports.rows[2].id).equal(3, 'Wrong deletion')
+          chai.expect(teleports.rows[3].id).equal(4, 'Wrong deletion')
         })
       })
       context('delete to last id', async () => {
@@ -981,57 +989,56 @@ describe('teleporteos', async () => {
 
   // Pay oracles
   context('pay oracles', async () => {
-    const {rows: [initialStat]} = await teleporteos.statsTable()
-    const amountPerOracle = Math.floor(Number(initialStat.collected) / initialStat.oracles)
-    const rest = Number(initialStat.collected) - amountPerOracle
     it('should succeed', async () => {
+      const {rows: [initialStat]} = await teleporteos.statsTable()
+      const amountPerOracle = BigInt(Math.floor(Number(initialStat.collected) / initialStat.oracles))
+      const rest = BigInt(initialStat.collected) - (amountPerOracle * BigInt(initialStat.oracles))
       await teleporteos.payoracles({ from: sender1 })
+      // Check rest
+      const {rows: [stat]} = await teleporteos.statsTable()
+      chai.expect(BigInt(stat.collected)).equal(rest, 'Wrong collected rest')
+      // Check oracle deposit amounts
+      const deposits = await teleporteos.depositsTable({lowerBound: oracle1.name})
+      chai.expect(stringToAsset(deposits.rows[0].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle')
+      chai.expect(stringToAsset(deposits.rows[1].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle')
+      chai.expect(stringToAsset(deposits.rows[2].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle')
     })
-    // Check rest
-    const {rows: [stat]} = await teleporteos.statsTable()
-    chai.expect(stat.collected).equal(rest, 'Wrong collected rest')
-    // Check oracle deposit amounts
-    const deposits = await teleporteos.depositsTable({lowerBound: oracle1.name})
-    chai.expect(stringToAsset(deposits.rows[0].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle')
-    chai.expect(stringToAsset(deposits.rows[1].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle')
-    chai.expect(stringToAsset(deposits.rows[2].quantity).amount).equal(amountPerOracle, 'Wrong amount for oracle')
   })
 
   // Delete receipts
   context('delete receipts', async () => {
-    const initialReceipts = await teleporteos.receiptsTable()
-    const secondDate = initialReceipts.rows[1].date
-    const lastDate = initialReceipts.rows[initialReceipts.rows.length - 1].date
-    context('with incorrect auth', async () => {
-      it('should fail with auth error', async () => {
-        await assertMissingAuthority(
-          teleporteos.delreceipts(lastDate, { from: sender1 })
-        )
-        await assertMissingAuthority(
-          teleporteos.delreceipts(lastDate, { from: oracle1 })
-        )
-      })
+    let initialReceipts; 
+    let lastDate: Date;
+    let second: Date;
+    it('get initial receipt table', async () => {
+      initialReceipts = await teleporteos.receiptsTable()
+      lastDate = fixLamingtionDate(initialReceipts.rows[initialReceipts.rows.length - 1].date)
+      second = fixLamingtionDate(initialReceipts.rows[1].date)
     })
-    context('with correct auth', async () => {
-      context('delete to id 2', async () => {
-        it('should succeed', async () => {
-            // Delete until the third one
-            await teleporteos.delreceipts(secondDate, { from: teleporteos.account })
-            const receipts = await teleporteos.receiptsTable()
-            chai.expect(receipts.rows.length).equal(3, 'Wrong amount of receipts are deleted')
-            chai.expect(receipts.rows[0].id).equal(1, 'Wrong deletion')
-            chai.expect(receipts.rows[1].id).equal(2, 'Wrong deletion')
-            chai.expect(receipts.rows[2].id).equal(3, 'Wrong deletion')
-        })
-      })
-      context('delete all', async () => {
-        it('should succeed', async () => {
-          // Delete until the third one
-          await teleporteos.delreceipts(new Date(lastDate.getTime() + 1), { from: teleporteos.account })
-          const receipts = await teleporteos.receiptsTable()
-          chai.expect(receipts.rows.length).equal(0, 'Not all deleted')
-        })
-      })
+    it('with user auth should fail with auth error', async () => {
+      await assertMissingAuthority(
+        teleporteos.delreceipts(lastDate, { from: sender1 })
+        )
+    })
+    it('with oracle auth should fail with auth error', async () => {
+      await assertMissingAuthority(
+          teleporteos.delreceipts(lastDate, { from: oracle1 })
+      )
+    })
+    it('with correct auth delete to id 2 should succeed', async () => {
+      // Delete until the third one
+        await teleporteos.delreceipts(second, { from: teleporteos.account })
+        const receipts = await teleporteos.receiptsTable()
+        chai.expect(receipts.rows.length).equal(3, 'Wrong amount of receipts are deleted')
+        chai.expect(receipts.rows[0].id).equal(1, 'Wrong deletion')
+        chai.expect(receipts.rows[1].id).equal(2, 'Wrong deletion')
+        chai.expect(receipts.rows[2].id).equal(3, 'Wrong deletion')
+    })
+    it('with correct auth delete all should succeed', async () => {
+      // Delete until the third one
+      await teleporteos.delreceipts(new Date(lastDate.getTime() + 1000), { from: teleporteos.account })
+      const receipts = await teleporteos.receiptsTable()
+      chai.expect(receipts.rows.length).equal(0, 'Not all deleted')
     })
   })
 })
@@ -1143,4 +1150,17 @@ function stringToAsset(asset_str: string){
 
 function calcFee(amount: bigint, fixfeeAmount: bigint, varfee: number){
   return BigInt(Math.floor(Number(amount) * varfee)) + fixfeeAmount
+}
+
+function fixLamingtionDate(date: Date){
+  // Lamington converts the date wrong. This will fix it
+  const offset = (new Date()).getTimezoneOffset() * 60 * 1000
+  return new Date(date.getTime() + offset)
+
+  // let d = correctedDate.toString()
+  // const ms = d.indexOf('.')
+  // if(ms != -1){
+  //   return d.substring(0, ms)
+  // }
+  // return d
 }

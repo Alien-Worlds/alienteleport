@@ -149,7 +149,7 @@ ACTION teleporteos::addchain(string name, string abbreviation, uint8_t chain_id,
   _stats.modify(*stat, get_self(), [&](auto &s) {
     ret = s.chains.insert(std::pair<uint8_t,chainData>(chain_id, chain));
   });
-  check(ret.second != false, "Chain was already added");
+  check(ret.second != false, "This chain is already listed");
 }
 
 ACTION teleporteos::rmchain(uint8_t chain_id){

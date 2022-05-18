@@ -41,7 +41,7 @@ const TestSettings = {
     decimals: 4,
   },
   threshold: 3,
-  chainId: 1,
+  chainId: 2,
   oracles: [{
     eosio_name: 'klausklaus12',
     keys: generateAllKeys('8940fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378100'),

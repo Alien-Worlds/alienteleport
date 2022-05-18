@@ -9,7 +9,7 @@ yarn install
 ```
 
 ### Configutration
-Use truffle-config.js file to change your test net settings.
+Use truffle-config.js file to change your test net settings. The current settings need a mnemonic key phrase stored in a file called "`.secret`".
 
 ### Run eth contract tests
 1. Start two consoles

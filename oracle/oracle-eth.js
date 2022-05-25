@@ -75,8 +75,8 @@ var EthOracle = /** @class */ (function () {
         this.running = false;
         this.claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
         this.teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
-        this.DEFAULT_BLOCKS_TO_WAIT = 5;
         this.minTrySend = 3;
+        this.blocksToWait = typeof config.eth.blocksToWait == 'number' && config.eth.blocksToWait > EthOracle.MIN_BLOCKS_TO_WAIT ? config.eth.blocksToWait : EthOracle.MIN_BLOCKS_TO_WAIT;
         this.blocks_file_name = ".oracle_".concat(configFile.eth.network, "_block-").concat(configFile.eth.oracleAccount);
         this.eos_api = new EndpointSwitcher_1.EosApi(this.config.eos.netId, this.config.eos.endpoints, this.signatureProvider);
         this.eth_api = new EndpointSwitcher_1.EthApi(this.config.eth.netId, this.config.eth.endpoints);
@@ -139,7 +139,7 @@ var EthOracle = /** @class */ (function () {
                     case 3:
                         receipt = _a.sent();
                         if (!receipt) return [3 /*break*/, 7];
-                        overConfs = receipt.confirmations - this.DEFAULT_BLOCKS_TO_WAIT;
+                        overConfs = receipt.confirmations - this.blocksToWait;
                         if (!(overConfs > 0)) return [3 /*break*/, 6];
                         ep = this.eth_api.getEndpoint();
                         validators.add(ep);
@@ -524,40 +524,44 @@ var EthOracle = /** @class */ (function () {
      * @param start_ref Block number to start from. String 'latest' to start from the latest block in block number file
      * @param trxBroadcast False if transactions should not be broadcasted (not submitted to the block chain)
      */
-    EthOracle.prototype.run = function (start_ref, trxBroadcast) {
+    EthOracle.prototype.run = function (start_ref, trxBroadcast, waitCycle) {
         if (trxBroadcast === void 0) { trxBroadcast = true; }
+        if (waitCycle === void 0) { waitCycle = 30; }
         return __awaiter(this, void 0, void 0, function () {
-            var from_block, latest_block, err_1, to_block, e_6;
+            var from_block, latest_block, err_1, to_block, e_6, e_7;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
                         this.running = true;
-                        return [4 /*yield*/, this.eth_api.nextEndpoint()];
+                        _a.label = 1;
                     case 1:
-                        _a.sent();
-                        return [4 /*yield*/, this.eos_api.nextEndpoint()];
+                        _a.trys.push([1, 27, , 28]);
+                        return [4 /*yield*/, this.eth_api.nextEndpoint()];
                     case 2:
                         _a.sent();
-                        _a.label = 3;
+                        return [4 /*yield*/, this.eos_api.nextEndpoint()];
                     case 3:
-                        if (!this.running) return [3 /*break*/, 24];
+                        _a.sent();
                         _a.label = 4;
                     case 4:
-                        _a.trys.push([4, 20, , 22]);
-                        return [4 /*yield*/, this.getLatestBlock()];
+                        if (!this.running) return [3 /*break*/, 26];
+                        _a.label = 5;
                     case 5:
+                        _a.trys.push([5, 22, , 24]);
+                        return [4 /*yield*/, this.getLatestBlock()];
+                    case 6:
                         latest_block = _a.sent();
                         if (typeof latest_block != 'number') {
                             console.error('Latest block number is not a number', latest_block);
                             return [2 /*return*/];
                         }
-                        if (!!from_block) return [3 /*break*/, 11];
-                        if (!(start_ref === 'latest')) return [3 /*break*/, 10];
-                        _a.label = 6;
-                    case 6:
-                        _a.trys.push([6, 8, , 9]);
-                        return [4 /*yield*/, EthOracle.load_block_number_from_file(this.blocks_file_name)];
+                        if (!!from_block) return [3 /*break*/, 12];
+                        if (!(start_ref === 'latest')) return [3 /*break*/, 11];
+                        _a.label = 7;
                     case 7:
+                        _a.trys.push([7, 9, , 10]);
+                        return [4 /*yield*/, EthOracle.load_block_number_from_file(this.blocks_file_name)];
+                    case 8:
                         from_block = _a.sent();
                         from_block -= 50; // for fresh start go back 50 blocks
                         if (this.config.eth.genesisBlock && this.config.eth.genesisBlock > from_block) {
@@ -567,8 +571,8 @@ var EthOracle = /** @class */ (function () {
                         else {
                             console.log("Starting from saved block with additional previous 50 blocks for safety: ".concat(from_block, "."));
                         }
-                        return [3 /*break*/, 9];
-                    case 8:
+                        return [3 /*break*/, 10];
+                    case 9:
                         err_1 = _a.sent();
                         console.log('Could not get block from file and it was not specified ❌');
                         if (this.config.eth.genesisBlock) {
@@ -579,66 +583,73 @@ var EthOracle = /** @class */ (function () {
                             from_block = latest_block - 100; // go back 100 blocks from latest
                             console.log('Start 100 blocks before the latest block.');
                         }
-                        return [3 /*break*/, 9];
-                    case 9: return [3 /*break*/, 11];
-                    case 10:
+                        return [3 /*break*/, 10];
+                    case 10: return [3 /*break*/, 12];
+                    case 11:
                         if (typeof start_ref === 'number') {
                             from_block = start_ref;
                         }
                         else {
                             from_block = this.config.eth.genesisBlock;
                         }
-                        _a.label = 11;
-                    case 11:
+                        _a.label = 12;
+                    case 12:
                         if (from_block < 0) {
                             from_block = 0;
                         }
                         to_block = Math.min(from_block + 100, latest_block);
-                        if (!(start_ref >= latest_block)) return [3 /*break*/, 13];
-                        console.log("Up to date at block ".concat(to_block));
-                        return [4 /*yield*/, sleep(10000)];
-                    case 12:
-                        _a.sent();
-                        _a.label = 13;
-                    case 13:
+                        if (!(from_block <= to_block)) return [3 /*break*/, 16];
                         console.log("Getting events from block ".concat(from_block, " to ").concat(to_block));
                         return [4 /*yield*/, this.process_claimed(from_block, to_block, trxBroadcast)];
-                    case 14:
+                    case 13:
                         _a.sent();
                         return [4 /*yield*/, this.process_teleported(from_block, to_block, trxBroadcast)];
+                    case 14:
+                        _a.sent();
+                        from_block = to_block; // In next round the current to block is the from block
+                        return [4 /*yield*/, EthOracle.save_block_to_file(to_block, this.blocks_file_name)]; // Save last block received
                     case 15:
-                        _a.sent();
-                        from_block = to_block;
-                        // Save last block received
-                        return [4 /*yield*/, EthOracle.save_block_to_file(to_block, this.blocks_file_name)];
+                        _a.sent(); // Save last block received
+                        return [3 /*break*/, 18];
                     case 16:
-                        // Save last block received
-                        _a.sent();
-                        if (!(latest_block - from_block <= 1000)) return [3 /*break*/, 18];
-                        return [4 /*yield*/, EthOracle.WaitWithAnimation(30, 'Wait for new blocks...')];
+                        console.log("\u26A1\uFE0F From block ".concat(from_block, " is higher than to block ").concat(to_block));
+                        return [4 /*yield*/, sleep(10000)];
                     case 17:
                         _a.sent();
-                        return [3 /*break*/, 19];
+                        _a.label = 18;
                     case 18:
-                        console.log("Latest block is ".concat(latest_block, ". Not waiting..."));
-                        _a.label = 19;
-                    case 19: return [3 /*break*/, 22];
+                        if (!(latest_block - from_block <= 1000)) return [3 /*break*/, 20];
+                        return [4 /*yield*/, EthOracle.WaitWithAnimation(waitCycle, 'Wait for new blocks...')];
+                    case 19:
+                        _a.sent();
+                        return [3 /*break*/, 21];
                     case 20:
+                        console.log("Latest block is ".concat(latest_block, ". Not waiting..."));
+                        _a.label = 21;
+                    case 21: return [3 /*break*/, 24];
+                    case 22:
                         e_6 = _a.sent();
                         console.error('⚡️ ' + e_6.message);
                         console.error('Try again in 5 seconds');
                         return [4 /*yield*/, sleep(5000)];
-                    case 21:
+                    case 23:
                         _a.sent();
-                        return [3 /*break*/, 22];
-                    case 22: 
+                        return [3 /*break*/, 24];
+                    case 24: 
                     // Select the next endpoint to distribute the requests
                     return [4 /*yield*/, this.eos_api.nextEndpoint()];
-                    case 23:
+                    case 25:
                         // Select the next endpoint to distribute the requests
                         _a.sent();
-                        return [3 /*break*/, 3];
-                    case 24: return [2 /*return*/];
+                        return [3 /*break*/, 4];
+                    case 26: return [3 /*break*/, 28];
+                    case 27:
+                        e_7 = _a.sent();
+                        console.error('⚡️ ' + e_7);
+                        return [3 /*break*/, 28];
+                    case 28:
+                        console.log('Thread closed 💀');
+                        return [2 /*return*/];
                 }
             });
         });
@@ -648,7 +659,7 @@ var EthOracle = /** @class */ (function () {
      * @param s Seconds to wait
      */
     EthOracle.WaitWithAnimation = function (s, info) {
-        if (info === void 0) { info = ""; }
+        if (info === void 0) { info = ''; }
         return __awaiter(this, void 0, void 0, function () {
             var i;
             return __generator(this, function (_a) {
@@ -676,6 +687,7 @@ var EthOracle = /** @class */ (function () {
             });
         });
     };
+    EthOracle.MIN_BLOCKS_TO_WAIT = 5;
     return EthOracle;
 }());
 // Handle params from console
@@ -684,6 +696,11 @@ var argv = yargs_1.default
     .option('block', {
     alias: 'b',
     description: 'Block number to start scanning from',
+})
+    .option('waiter', {
+    alias: 'w',
+    description: 'Seconds to wait after finishing all current teleports',
+    type: 'number'
 })
     .option('config', {
     alias: 'c',
@@ -718,8 +735,15 @@ if (configFile.eos.epVerifications > configFile.eos.endpoints.length) {
     console.error('Error: epVerifications cannot be greater than given amount of endpoints');
     process.exit(1);
 }
+var waitCycle = undefined;
+if (typeof configFile.eth.waitCycle == 'number') {
+    waitCycle = configFile.eth.waitCycle;
+}
+if (argv.waiter) {
+    waitCycle = argv.waiter;
+}
 // Set up the oracle
 var eosSigProvider = new eosjs_jssig_1.JsSignatureProvider([configFile.eos.privateKey]);
 var ethOracle = new EthOracle(configFile, eosSigProvider);
 // Run the process
-ethOracle.run(startRef, argv.broadcast);
+ethOracle.run(startRef, argv.broadcast, waitCycle);

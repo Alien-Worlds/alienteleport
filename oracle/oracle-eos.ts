@@ -389,7 +389,7 @@ class EosOracle{
      * @param id Teleport id to start from
      * @param requestAmount Amount of requested teleports per request
      */
-    async run(id = 0, requestAmount = 100){
+    async run(id = 0, requestAmount = 100, waitCycle = EosOracle.maxWait){
         console.log(`Starting EOS watcher for ETH oracle ${this.config.eth.oracleAccount}`)
         
         // Create an object to change the current id on each run
@@ -400,7 +400,7 @@ class EosOracle{
                 await this.eos_api.nextEndpoint()
                 await this.updateTimes()
                 await this.signAllTeleportsUntilNow(signProcessData)
-                await EosOracle.WaitWithAnimation(EosOracle.maxWait, 'All available teleports signed')
+                await EosOracle.WaitWithAnimation(waitCycle, 'All available teleports signed')
             }
         } catch (e){
             console.error('⚡️ ' + e)
@@ -427,6 +427,11 @@ const argv = yargs
         description: 'Amount of signatures until this oracle will sign too',
         type: 'number'
     })
+    .option('waiter', {
+        alias: 'w',
+        description: 'Seconds to wait after finishing all current teleports',
+        type: 'number'
+    })
     .option('config', {
         alias: 'c',
         description: 'Path of config file',
@@ -436,7 +441,8 @@ const argv = yargs
         id: number,
         amount: number,
         signs: number,
-        config: string
+        waiter: number,
+        config: string,
     }
 
 // Load config and set title
@@ -448,5 +454,14 @@ const configFile : ConfigType = require(config_path)
 const signatureProvider = new JsSignatureProvider([configFile.eos.privateKey])
 const eosOracle = new EosOracle(configFile, signatureProvider)
 
+// Get time to wait for each round by config file or comsole parameters
+let waitCycle : undefined | number = undefined
+if(typeof configFile.eos.waitCycle == 'number'){
+    waitCycle = configFile.eos.waitCycle
+}
+if(argv.waiter) {
+    waitCycle = argv.waiter 
+}
+
 // Run the process
-eosOracle.run(argv.id, argv.amount)
+eosOracle.run(argv.id, argv.amount, waitCycle)

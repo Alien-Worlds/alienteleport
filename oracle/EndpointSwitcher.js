@@ -81,7 +81,7 @@ var EosApi = /** @class */ (function () {
      */
     EosApi.prototype.nextEndpoint = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var i;
+            var i, info;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -98,14 +98,13 @@ var EosApi = /** @class */ (function () {
                         if (!!this.gotRightInfo[this.epId]) return [3 /*break*/, 3];
                         return [4 /*yield*/, this.checkInfo()];
                     case 2:
-                        if (_a.sent()) {
+                        info = _a.sent();
+                        if (info === true) {
                             this.gotRightInfo[this.epId] = true;
-                            // console.log('Use new endpoint', this.endpoint);
                             return [2 /*return*/];
                         }
-                        else {
+                        else if (info === null) {
                             i--;
-                            return [3 /*break*/, 4];
                         }
                         return [3 /*break*/, 4];
                     case 3: 
@@ -138,7 +137,7 @@ var EosApi = /** @class */ (function () {
                             this.endpointList.splice(this.epId, 1);
                             this.gotRightInfo.splice(this.epId, 1);
                             this.epId--;
-                            return [2 /*return*/, false];
+                            return [2 /*return*/, null];
                         }
                         return [3 /*break*/, 3];
                     case 2:
@@ -228,7 +227,7 @@ var EthApi = /** @class */ (function () {
                             this.gotRightInfo.splice(this.epId, 1);
                             this.providers.splice(this.epId, 1);
                             this.epId--;
-                            return [2 /*return*/, false];
+                            return [2 /*return*/, null];
                         }
                         return [3 /*break*/, 3];
                     case 2:
@@ -245,7 +244,7 @@ var EthApi = /** @class */ (function () {
      */
     EthApi.prototype.nextEndpoint = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var i;
+            var i, info;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -266,13 +265,13 @@ var EthApi = /** @class */ (function () {
                         if (!!this.gotRightInfo[this.epId]) return [3 /*break*/, 3];
                         return [4 /*yield*/, this.checkInfo()];
                     case 2:
-                        if (_a.sent()) {
+                        info = _a.sent();
+                        if (info === true) {
                             this.gotRightInfo[this.epId] = true;
                             return [2 /*return*/];
                         }
-                        else {
+                        else if (info === null) {
                             i--;
-                            return [3 /*break*/, 4];
                         }
                         return [3 /*break*/, 4];
                     case 3:

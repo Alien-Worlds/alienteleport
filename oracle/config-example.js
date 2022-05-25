@@ -15,6 +15,7 @@ module.exports = {
         teleportContract: 'alein.worlds',   // EOSIO token contract account
         oracleAccount: 'oracle1',           // EOSIO oracle account
         privateKey: '5K29JmEvWEnfdD5DV1bm9Ro4qMrTKhBGmTXuaaqmrZSMEntqqZQ', // Example private EOSIO key. Do not use it. It is public!
+        waitCycle: 165,                     // Seconds to wait to check for new teleports after all teleports are handled. EOSIO chains typically needs 165 seconds to set transactions as irreversible.
     },
     eth: {
         network: 'BSC', // Abbreviation of the chain
@@ -30,5 +31,7 @@ module.exports = {
         teleportContract: '0x281D131268f5D257297DDDe4B4047EeF881db79d', // ETH teleport contract address
         oracleAccount: '0x8353C7d4758D113Dd4407AC4b1115fF2E54D9eA0',    // ETH oracle address
         privateKey: '8940fbd7806ec09af7e1ceaf7ccac80e89eeeb1e85cee42f84c07b1d5a378100', // Example private ETH key. Do not use it. It is public!
+        waitCycle: 10,          // Seconds to wait to check for new teleports after all teleports are handled
+        blocksToWait: 6,        // Amount of blocks to wait until it will be considered as irreversible. Lowest accepted value is 5
     }
 }

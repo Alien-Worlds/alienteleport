@@ -15,7 +15,8 @@ export interface ConfigType {
         privateKey: string,
         // genesisBlock: number,
         oraclePermission?: string,
-        epVerifications: number
+        epVerifications: number,
+        waitCycle: number,
     }
     eth: {
         network: string,
@@ -28,7 +29,9 @@ export interface ConfigType {
         oracleAccount: string,
         privateKey: string,
         genesisBlock: number,
-        epVerifications: number
+        epVerifications: number,
+        waitCycle?: number,
+        blocksToWait?: number,
     }
 }
 

@@ -523,9 +523,10 @@ var EosOracle = /** @class */ (function () {
      * @param id Teleport id to start from
      * @param requestAmount Amount of requested teleports per request
      */
-    EosOracle.prototype.run = function (id, requestAmount) {
+    EosOracle.prototype.run = function (id, requestAmount, waitCycle) {
         if (id === void 0) { id = 0; }
         if (requestAmount === void 0) { requestAmount = 100; }
+        if (waitCycle === void 0) { waitCycle = EosOracle.maxWait; }
         return __awaiter(this, void 0, void 0, function () {
             var signProcessData, e_4;
             return __generator(this, function (_a) {
@@ -550,7 +551,7 @@ var EosOracle = /** @class */ (function () {
                         return [4 /*yield*/, this.signAllTeleportsUntilNow(signProcessData)];
                     case 5:
                         _a.sent();
-                        return [4 /*yield*/, EosOracle.WaitWithAnimation(EosOracle.maxWait, 'All available teleports signed')];
+                        return [4 /*yield*/, EosOracle.WaitWithAnimation(waitCycle, 'All available teleports signed')];
                     case 6:
                         _a.sent();
                         return [3 /*break*/, 2];
@@ -587,6 +588,11 @@ var argv = yargs_1.default
     description: 'Amount of signatures until this oracle will sign too',
     type: 'number'
 })
+    .option('waiter', {
+    alias: 'w',
+    description: 'Seconds to wait after finishing all current teleports',
+    type: 'number'
+})
     .option('config', {
     alias: 'c',
     description: 'Path of config file',
@@ -600,5 +606,13 @@ var configFile = require(config_path);
 // Configure eosjs specific propperties
 var signatureProvider = new eosjs_jssig_1.JsSignatureProvider([configFile.eos.privateKey]);
 var eosOracle = new EosOracle(configFile, signatureProvider);
+// Get time to wait for each round by config file or comsole parameters
+var waitCycle = undefined;
+if (typeof configFile.eos.waitCycle == 'number') {
+    waitCycle = configFile.eos.waitCycle;
+}
+if (argv.waiter) {
+    waitCycle = argv.waiter;
+}
 // Run the process
-eosOracle.run(argv.id, argv.amount);
+eosOracle.run(argv.id, argv.amount, waitCycle);

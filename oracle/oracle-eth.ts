@@ -8,7 +8,7 @@ When an event is received, it will call the `received` action on the EOS chain
 
 import fs from 'fs'
 import { ethers } from 'ethers'
-import yargs from 'yargs'
+import yargs, { number } from 'yargs'
 import { ConfigType, eosio_claim_data, eosio_teleport_data } from './CommonTypes'
 import { JsSignatureProvider } from 'eosjs/dist/eosjs-jssig'
 import { EosApi, EthApi } from './EndpointSwitcher'
@@ -30,13 +30,15 @@ class EthOracle {
     public running = false
     private claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17'
     private teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5'
-    private DEFAULT_BLOCKS_TO_WAIT = 5
+    static MIN_BLOCKS_TO_WAIT = 5
+    private blocksToWait : number
     private blocks_file_name : string
     private eos_api: EosApi
     private eth_api: EthApi
     private minTrySend = 3
 
     constructor(private config: ConfigType, private signatureProvider: JsSignatureProvider){
+        this.blocksToWait = typeof config.eth.blocksToWait == 'number' && config.eth.blocksToWait > EthOracle.MIN_BLOCKS_TO_WAIT? config.eth.blocksToWait : EthOracle.MIN_BLOCKS_TO_WAIT
         this.blocks_file_name = `.oracle_${configFile.eth.network}_block-${configFile.eth.oracleAccount}`
         this.eos_api = new EosApi(this.config.eos.netId, this.config.eos.endpoints, this.signatureProvider)
         this.eth_api = new EthApi(this.config.eth.netId, this.config.eth.endpoints)
@@ -96,7 +98,8 @@ class EthOracle {
                 const receipt = await this.eth_api.getProvider().getTransactionReceipt(entry.transactionHash)
                 
                 if(receipt){
-                    const overConfs = receipt.confirmations - this.DEFAULT_BLOCKS_TO_WAIT
+                    // CHeck amount of block confirmations
+                    const overConfs = receipt.confirmations - this.blocksToWait
                     if (overConfs > 0) {
                         let ep = this.eth_api.getEndpoint()
                         validators.add(ep)
@@ -335,7 +338,7 @@ class EthOracle {
        let tries = 0
        while(true) {
            try{
-               const block = await this.eth_api.getProvider().getBlock('latest')               
+               const block = await this.eth_api.getProvider().getBlock('latest')
                return block.number
            } catch(e){
                if(tries >= this.eth_api.get_EndpointAmount()){
@@ -357,100 +360,103 @@ class EthOracle {
      * @param start_ref Block number to start from. String 'latest' to start from the latest block in block number file
      * @param trxBroadcast False if transactions should not be broadcasted (not submitted to the block chain)
      */
-    async run(start_ref: 'latest' | number, trxBroadcast: boolean = true){
+    async run(start_ref: 'latest' | number, trxBroadcast: boolean = true, waitCycle = 30){
         let from_block: number | undefined
         this.running = true
-        await this.eth_api.nextEndpoint()
-        await this.eos_api.nextEndpoint()
-
-        while (this.running) {
-            try {
-                // Get latest block from chain
-                const latest_block = await this.getLatestBlock()
-                if(typeof latest_block != 'number'){
-                    console.error('Latest block number is not a number', latest_block)
-                    return
-                }
-
-                // Get block number to start from
-                if (!from_block) {
-                    if (start_ref === 'latest') {
-                        try {
-                            from_block = await EthOracle.load_block_number_from_file(this.blocks_file_name)
-                            from_block -= 50                     // for fresh start go back 50 blocks
-                            if(this.config.eth.genesisBlock && this.config.eth.genesisBlock > from_block){
-                                from_block = this.config.eth.genesisBlock
-                                console.log('Start by genesis block.')
-                            } else {
-                                console.log(`Starting from saved block with additional previous 50 blocks for safety: ${from_block}.`)
-                            }
-                        } catch (err) {
-                            console.log('Could not get block from file and it was not specified ❌')
-                            if(this.config.eth.genesisBlock){
-                                from_block = this.config.eth.genesisBlock
-                                console.log('Start by genesis block.')
-                            } else {
-                                from_block = latest_block - 100     // go back 100 blocks from latest
-                                console.log('Start 100 blocks before the latest block.')
-                            }
-                        }
-                    } else if (typeof start_ref === 'number') {
-                            from_block = start_ref
-                    } else {
-                        from_block = this.config.eth.genesisBlock
-                    }
-                }
-                if(from_block < 0){
-                    from_block = 0
-                }
-
-                let to_block = Math.min(from_block + 100, latest_block)
-
-                if (start_ref >= latest_block) {
-                    console.log(`Up to date at block ${to_block}`)
-                    await sleep(10000)
-                }
-                console.log(`Getting events from block ${from_block} to ${to_block}`)
-
-                await this.process_claimed(from_block, to_block, trxBroadcast)
-                await this.process_teleported(from_block, to_block, trxBroadcast)
-
-                from_block = to_block
-
-                // Save last block received
-                await EthOracle.save_block_to_file(to_block, this.blocks_file_name)
-
-                if (latest_block - from_block <= 1000) {
-                    await EthOracle.WaitWithAnimation(30, 'Wait for new blocks...')
-                } else {
-                    console.log(`Latest block is ${latest_block}. Not waiting...`)
-                }
-            } catch (e: any) {
-                console.error('⚡️ ' + e.message)
-
-                console.error('Try again in 5 seconds')
-                await sleep(5000)
-            }
-            // Select the next endpoint to distribute the requests
+        try{
+            await this.eth_api.nextEndpoint()
             await this.eos_api.nextEndpoint()
+        
+            while (this.running) {
+                try {
+                    // Get latest block from chain
+                    const latest_block = await this.getLatestBlock()
+                    if(typeof latest_block != 'number'){
+                        console.error('Latest block number is not a number', latest_block)
+                        return
+                    }
+
+                    // Get block number to start from on this cycle
+                    if (!from_block) {
+                        if (start_ref === 'latest') {
+                            try {
+                                from_block = await EthOracle.load_block_number_from_file(this.blocks_file_name)
+                                from_block -= 50                     // for fresh start go back 50 blocks
+                                if(this.config.eth.genesisBlock && this.config.eth.genesisBlock > from_block){
+                                    from_block = this.config.eth.genesisBlock
+                                    console.log('Start by genesis block.')
+                                } else {
+                                    console.log(`Starting from saved block with additional previous 50 blocks for safety: ${from_block}.`)
+                                }
+                            } catch (err) {
+                                console.log('Could not get block from file and it was not specified ❌')
+                                if(this.config.eth.genesisBlock){
+                                    from_block = this.config.eth.genesisBlock
+                                    console.log('Start by genesis block.')
+                                } else {
+                                    from_block = latest_block - 100     // go back 100 blocks from latest
+                                    console.log('Start 100 blocks before the latest block.')
+                                }
+                            }
+                        } else if (typeof start_ref === 'number') {
+                                from_block = start_ref
+                        } else {
+                            from_block = this.config.eth.genesisBlock
+                        }
+                    }
+                    if(from_block < 0){
+                        from_block = 0
+                    }
+
+                    // Get the last block number until teleports should be checked on this cycle
+                    let to_block = Math.min(from_block + 100, latest_block)
+
+                    if (from_block <= to_block) {
+                        console.log(`Getting events from block ${from_block} to ${to_block}`)
+                        await this.process_claimed(from_block, to_block, trxBroadcast)
+                        await this.process_teleported(from_block, to_block, trxBroadcast)
+                        from_block = to_block                                               // In next round the current to block is the from block
+                        await EthOracle.save_block_to_file(to_block, this.blocks_file_name) // Save last block received
+                    } else {
+                        console.log(`⚡️ From block ${from_block} is higher than to block ${to_block}`)
+                        await sleep(10000)
+                    }
+                    if (latest_block - from_block <= 1000) {
+                        await EthOracle.WaitWithAnimation(waitCycle, 'Wait for new blocks...')
+                    } else {
+                        console.log(`Latest block is ${latest_block}. Not waiting...`)
+                    }
+                } catch (e: any) {
+                    console.error('⚡️ ' + e.message)
+
+                    console.error('Try again in 5 seconds')
+                    await sleep(5000)
+                }
+
+                // Select the next endpoint to distribute the requests
+                await this.eos_api.nextEndpoint()
+            }
+        } catch(e){
+            console.error('⚡️ ' + e)
         }
+        console.log('Thread closed 💀');
     }
 
     /**
      * Wait for a defined amount of time and show remaining seconds
      * @param s Seconds to wait
      */
-         static async WaitWithAnimation(s: number, info: string = ""){
-            process.stdout.write(info + "\n\x1b[?25l")
-            for(let i = 0; i < s; i++){
-                process.stdout.write(`💤 ${i} s / ${s} s 💤`)
-                await sleep(1000)
-                process.stdout.write("\r\x1b[K")
-            }
-            
-            process.stdout.moveCursor(0, -1) // up one line
-            process.stdout.clearLine(1) // from cursor to end
+    static async WaitWithAnimation(s: number, info: string = ''){
+        process.stdout.write(info + "\n\x1b[?25l")
+        for(let i = 0; i < s; i++){
+            process.stdout.write(`💤 ${i} s / ${s} s 💤`)
+            await sleep(1000)
+            process.stdout.write("\r\x1b[K")
         }
+        
+        process.stdout.moveCursor(0, -1) // up one line
+        process.stdout.clearLine(1) // from cursor to end
+    }
 }
 
 // Handle params from console
@@ -459,6 +465,11 @@ const argv = yargs
     .option('block', {
         alias: 'b',
         description: 'Block number to start scanning from',
+    })
+    .option('waiter', {
+        alias: 'w',
+        description: 'Seconds to wait after finishing all current teleports',
+        type: 'number'
     })
     .option('config', {
         alias: 'c',
@@ -473,6 +484,7 @@ const argv = yargs
     })
     .help().alias('help', 'h').argv as {
         block: number,
+        waiter: number,
         config: string,
         broadcast: boolean,
     }
@@ -498,10 +510,17 @@ if(configFile.eos.epVerifications > configFile.eos.endpoints.length){
     console.error('Error: epVerifications cannot be greater than given amount of endpoints')
     process.exit(1)
 }
+let waitCycle : undefined | number = undefined
+if(typeof configFile.eth.waitCycle == 'number'){
+    waitCycle = configFile.eth.waitCycle
+}
+if(argv.waiter) {
+    waitCycle = argv.waiter 
+}
 
 // Set up the oracle
 const eosSigProvider = new JsSignatureProvider([configFile.eos.privateKey])
 const ethOracle = new EthOracle(configFile, eosSigProvider)
-
 // Run the process
-ethOracle.run(startRef, argv.broadcast)
+ethOracle.run(startRef, argv.broadcast, waitCycle)
+

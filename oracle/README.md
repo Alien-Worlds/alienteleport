@@ -7,7 +7,7 @@
 yarn install
 ```
 ## Configutration
-Edit config.js file
+Setup a file called `config.js` like the `config-example.js`
 
 ## Compile and start eos oracle
 ```

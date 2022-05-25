@@ -38,13 +38,13 @@ export class EosApi {
             
             this.getAPI()
             if(!this.gotRightInfo[this.epId]){
-                if(await this.checkInfo()){
+
+                const info = await this.checkInfo() 
+                if(info === true){
                     this.gotRightInfo[this.epId] = true
-                    // console.log('Use new endpoint', this.endpoint);
                     return
-                } else {
+                } else if(info === null){
                     i--
-                    continue
                 }
             } else {
                 // console.log('Use next endpoint', this.endpoint);
@@ -66,7 +66,7 @@ export class EosApi {
                 this.endpointList.splice(this.epId, 1)
                 this.gotRightInfo.splice(this.epId, 1)
                 this.epId--
-                return false
+                return null
             } 
         } catch {
             console.log('Can not connect to endpoint', this.endpoint)
@@ -150,7 +150,7 @@ export class EthApi{
                 this.gotRightInfo.splice(this.epId, 1)
                 this.providers.splice(this.epId, 1)
                 this.epId--
-                return false
+                return null
             } 
         } catch (e) {
             console.log('Can not connect to endpoint')
@@ -178,12 +178,12 @@ export class EthApi{
 
             // Check info of the rovider if it was never checked before
             if(!this.gotRightInfo[this.epId]){
-                if(await this.checkInfo()){
+                const info = await this.checkInfo() 
+                if(info === true){
                     this.gotRightInfo[this.epId] = true
                     return
-                } else {
+                } else if(info === null){
                     i--
-                    continue
                 }
             } else {
                 console.log('Use next endpoint', this.endpoint) //-

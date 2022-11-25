@@ -1,6 +1,13 @@
-oracle/node_modules
+.vs
+.vscode
 config.js
-contracts/teleporteos/node_modules
 teleporteos.ts
 eosio.token.ts
 contracts/teleporteos/artifacts
+build
+node_modules
+.eosproj
+.secret
+*.code-workspace
+teleporteos.abi
+teleporteos.wasm

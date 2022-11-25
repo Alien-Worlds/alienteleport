@@ -1,9 +1,10 @@
 {
   "name": "alienteleport-oracle",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
+    "eth": "tsc && node oracle-eth.js",
+    "eos": "tsc && node oracle-eos.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -11,15 +12,21 @@
   "dependencies": {
     "@eosdacio/eosio-statereceiver": "^1.0.2",
     "abi-decoder": "^2.4.0",
+    "child-process": "^1.0.2",
+    "cross-fetch": "^3.1.5",
     "eosjs": "^22.0.0",
-    "eosio-helpers": "^0.1.4",
     "ethereumjs-util": "^7.0.4",
-    "ethers": "^5.3.1",
-    "node-fetch": "2.0",
+    "ethers": "^5.6.2",
+    "node-fetch": "^3.2.3",
     "text-encoding": "^0.7.0",
-    "web3": "^1.2.11"
+    "web3": "^1.7.3",
+    "yargs": "^17.4.1"
   },
   "devDependencies": {
-    "@types/text-encoding": "0.0.36"
+    "@types/elliptic": "^6.4.14",
+    "@types/ethereumjs-util": "^6.1.0",
+    "@types/text-encoding": "0.0.36",
+    "@types/yargs": "^17.0.10",
+    "typescript": "^4.7.2"
   }
 }

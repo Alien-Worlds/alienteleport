@@ -1,0 +1,10 @@
+{
+  "type": "commonjs",
+  "dependencies": {
+    "@truffle/hdwallet-provider": "^2.0.8",
+    "eosjs": "^22.1.0",
+    "eosjs-ecc": "^4.0.7",
+    "ethereumjs-util": "^7.0.4",
+    "text-encoding": "^0.7.0"
+  }
+}

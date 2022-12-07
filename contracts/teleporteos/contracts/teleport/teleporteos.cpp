@@ -96,9 +96,10 @@ void teleporteos::cancel(uint64_t id) {
   check(!teleport->claimed, "Teleport is already claimed");
 
   /* wait 32 days to give time to mark as claimed */
-  uint32_t thirty_two_days = 60 * 60 * 24 * 32;
+  uint32_t expiry_time_seconds = 60 * 60 * 24 * 30;
   uint32_t now = current_time_point().sec_since_epoch();
-  check((teleport->time + thirty_two_days) < now, "Teleport has not expired");
+  check((teleport->time + expiry_time_seconds) < now,
+        "Teleport has not expired");
 
   // Refund the teleport and mark it as cancelled
   auto existing = _cancels.find(id);

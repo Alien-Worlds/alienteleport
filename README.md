@@ -27,7 +27,9 @@ Only monitoring is recomended around the oracles script processes to ensure ther
 
 ## Setup
 
-Oracle accounts must be registered using the `regoracle` (Antelope) and `regOracle` (EVM) functions.
+To run as an oracle, each oracle will need to be able to run 3 scripts included in the repo (`oracle-eos.js` and `oracle-eth.js` configured for BSC chain and another `oracle-eth.js` process configured for Ethereum). This URL details should added to a config file (based on `./oracle/config-examle.js` of this repo). Each will need access to a running SHiP node for the live transactions on WAX and the ability query an endpoint for table data on WAX. They will also need the equivalent on the Eth/BSC side to track live transactions and be able to query for block data - via a service provider.
+
+Oracle accounts must be registered using the `regoracle` (Antelope) and `regOracle` (EVM) functions. These actions require the auth of federation@active to prevent anyone from registering in an uncontrolled way.
 
 Successfully registered oracles can then call the received function on each contract when they see a transaction on the opposing chain. The oracles scripts and smart contracts on each chain verify the data is correct automatically. Other than configuring oracle signing keys and API endpoint details there is no code or further configuration required.
 

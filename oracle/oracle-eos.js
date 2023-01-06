@@ -11,7 +11,7 @@ const config_file = process.env['CONFIG'] || './config';
 process.title = `oracle-eos ${config_file}`;
 
 const StateReceiver = require('@eosdacio/eosio-statereceiver');
-const {Api, JsonRpc, Serialize} = require('eosjs');
+const { Api, JsonRpc, Serialize } = require('eosjs');
 const { JsSignatureProvider } = require('eosjs/dist/eosjs-jssig');
 const fetch = require('node-fetch');
 const { TextDecoder, TextEncoder } = require('text-encoding');
@@ -24,7 +24,7 @@ const config = require(config_file);
 
 const web3 = new Web3(new Web3.providers.HttpProvider(config.eth.endpoint));
 const signatureProvider = new JsSignatureProvider([config.eos.privateKey]);
-const rpc = new JsonRpc(config.eos.endpoint, {fetch});
+const rpc = new JsonRpc(config.eos.endpoint, { fetch });
 const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder(), textEncoder: new TextEncoder() });
 
 let tx_dispatcher = null;
@@ -32,7 +32,7 @@ let tx_dispatcher = null;
 // const ethAbi = require(`./eth_abi`);
 
 class TraceHandler {
-    constructor({config}) {
+    constructor({ config }) {
         this.config = config;
         this.queue = [];
         this.processingQueue = false;
@@ -40,10 +40,10 @@ class TraceHandler {
     }
 
     async processQueue() {
-        if (!this.queue.length || this.processingQueue){
+        if (!this.queue.length || this.processingQueue) {
             return;
         }
-        if (!tx_dispatcher){
+        if (!tx_dispatcher) {
             console.log(`No dispatcher yet`);
         }
 
@@ -56,7 +56,7 @@ class TraceHandler {
         const data_serialized = item.data_serialized;
         let retries = item.retries;
 
-        if (retries > 20){
+        if (retries > 20) {
             console.error(`Exceeded retries`);
             return;
         }
@@ -71,7 +71,7 @@ class TraceHandler {
                 limit: 1
             });
             // console.log(teleport_res);
-            if (!teleport_res.rows.length){
+            if (!teleport_res.rows.length) {
                 throw new Error(`Could not find teleport with id ${data.id}`);
             }
             const chain_data = teleport_res.rows[0];
@@ -107,7 +107,7 @@ class TraceHandler {
 
             tx_dispatcher.send(JSON.stringify(actions));
         }
-        catch (e){
+        catch (e) {
             console.error(`Error pushing confirmation ${e.message}`);
             setTimeout(() => {
                 item.retries++;
@@ -119,9 +119,9 @@ class TraceHandler {
         this.processingQueue = false;
     }
 
-    async sendSignature(data, data_serialized, retries=0) {
+    async sendSignature(data, data_serialized, retries = 0) {
         console.log(data, data_serialized, Buffer.from(data_serialized).toString('hex'));
-        this.queue.push({data, data_serialized, retries});
+        this.queue.push({ data, data_serialized, retries });
 
         // verify signature
         /*var sigDecoded = ethUtil.fromRpcSig(signature)
@@ -142,7 +142,8 @@ class TraceHandler {
                         //console.log(action)
                         switch (action[0]) {
                             case 'action_trace_v0':
-                                if (action[1].act.account === this.config.eos.teleportContract && action[1].act.name === 'logteleport'){
+                            case 'action_trace_v1':
+                                if (action[1].act.account === this.config.eos.teleportContract && action[1].act.name === 'logteleport') {
                                     const action_deser = await eos_api.deserializeActions([action[1].act]);
                                     console.log(`Sending ${action_deser[0].data.quantity} to ${action_deser[0].data.eth_address}`, action_deser[0].data);
                                     this.sendSignature(action_deser[0].data, action[1].act.data);
@@ -157,7 +158,7 @@ class TraceHandler {
 
 
 const start = async (config, start_block) => {
-    const trace_handler = new TraceHandler({config});
+    const trace_handler = new TraceHandler({ config });
 
     sr = new StateReceiver({
         startBlock: start_block,
@@ -175,9 +176,9 @@ const run = async (config) => {
     console.log(`Starting EOS watcher for ETH oracle ${config.eth.oracleAccount}`);
 
     let start_block;
-    if (typeof process.argv[2] !== 'undefined'){
+    if (typeof process.argv[2] !== 'undefined') {
         start_block = parseInt(process.argv[2]);
-        if (isNaN(start_block)){
+        if (isNaN(start_block)) {
             console.error(`Start block must be a number`);
             process.exit(1);
         }
@@ -191,10 +192,10 @@ const run = async (config) => {
     tx_dispatcher = fork('./txdispatch', [JSON.stringify(config)]);
     tx_dispatcher.on('message', (msg) => {
         const json = JSON.parse(msg);
-        if (json.type === 'success'){
+        if (json.type === 'success') {
             console.log(`Pushed confirmation with txid ${json.txid}`);
         }
-        else if (json.type === 'error'){
+        else if (json.type === 'error') {
             console.error(`Error pushing signature ${json.message}`);
             setTimeout(() => {
                 tx_dispatcher.send(JSON.stringify(json.actions));

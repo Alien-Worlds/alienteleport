@@ -216,6 +216,30 @@ void teleporteos::repairrec(uint64_t id, asset quantity, vector<name> approvers,
   });
 }
 
+void teleporteos::inserttel(name from, asset quantity, uint8_t chain_id,
+                            checksum256 eth_address) {
+  require_auth(from);
+
+  check(quantity.is_valid(), "Amount is not valid");
+
+  uint64_t next_teleport_id = _teleports.available_primary_key();
+  uint32_t now = current_time_point().sec_since_epoch();
+  _teleports.emplace(from, [&](auto &t) {
+    t.id = next_teleport_id;
+    t.time = now;
+    t.account = from;
+    t.quantity = quantity;
+    t.chain_id = chain_id;
+    t.eth_address = eth_address;
+    t.claimed = false;
+  });
+
+  action(
+      permission_level{get_self(), "active"_n}, get_self(), "logteleport"_n,
+      make_tuple(next_teleport_id, now, from, quantity, chain_id, eth_address))
+      .send();
+}
+
 /*
  * Marks a teleport as claimed
  */

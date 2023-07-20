@@ -1,7 +1,7 @@
 oracle/node_modules
 config.js
-contracts/teleporteos/node_modules
 teleporteos.ts
 eosio.token.ts
-contracts/teleporteos/artifacts
 .vscode
+smart_contracts/antelope/artifacts
+smart_contracts/antelope/node_modules

@@ -5,20 +5,12 @@ import {
   Account,
   assertEOSErrorIncludesMessage,
   assertMissingAuthority,
-  EOSManager,
-  debugPromise,
-  assertRowsEqualStrict,
-  assertRowCount,
-  assertEOSException,
-  assertEOSError,
   UpdateAuth,
-  assertRowsContain,
 } from 'lamington';
 import * as chai from 'chai';
 
 import { Teleporteos } from './teleporteos';
 import { EosioToken } from '../eosio.token/eosio.token';
-import { assert } from 'console';
 
 const ethToken =
   '2222222222222222222222222222222222222222222222222222222222222222';
@@ -31,7 +23,9 @@ let sender2: Account;
 let oracle1: Account;
 let oracle2: Account;
 let oracle3: Account;
+let removedOracle: Account;
 let oracle4: Account;
+let oracle5: Account;
 
 describe('teleporteos', async () => {
   before(async () => {
@@ -62,7 +56,43 @@ describe('teleporteos', async () => {
         });
       });
       it('should succeed to add another oracle', async () => {
+        await teleporteos.regoracle(removedOracle.name, {
+          from: teleporteos.account,
+        });
+      });
+      it('should succeed to add another oracle', async () => {
         await teleporteos.regoracle(oracle4.name, {
+          from: teleporteos.account,
+        });
+      });
+      it('should succeed to add another oracle', async () => {
+        await teleporteos.regoracle(oracle5.name, {
+          from: teleporteos.account,
+        });
+      });
+      it('should update oracles table', async () => {
+        await assertRowsEqual(teleporteos.oraclesTable(), [
+          { account: oracle1.name },
+          { account: oracle2.name },
+          { account: oracle3.name },
+          { account: removedOracle.name },
+          { account: oracle4.name },
+          { account: oracle5.name },
+        ]);
+      });
+    });
+  });
+  context('unregoracle', async () => {
+    context('with incorrect auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.unregoracle(removedOracle.name, { from: sender1 })
+        );
+      });
+    });
+    context('with correct auth', async () => {
+      it('should succeed', async () => {
+        await teleporteos.unregoracle(removedOracle.name, {
           from: teleporteos.account,
         });
       });
@@ -72,29 +102,7 @@ describe('teleporteos', async () => {
           { account: oracle2.name },
           { account: oracle3.name },
           { account: oracle4.name },
-        ]);
-      });
-    });
-  });
-  context('unregoracle', async () => {
-    context('with incorrect auth', async () => {
-      it('should fail with auth error', async () => {
-        await assertMissingAuthority(
-          teleporteos.unregoracle(oracle4.name, { from: sender1 })
-        );
-      });
-    });
-    context('with correct auth', async () => {
-      it('should succeed', async () => {
-        await teleporteos.unregoracle(oracle4.name, {
-          from: teleporteos.account,
-        });
-      });
-      it('should update oracles table', async () => {
-        await assertRowsEqual(teleporteos.oraclesTable(), [
-          { account: oracle1.name },
-          { account: oracle2.name },
-          { account: oracle3.name },
+          { account: oracle5.name },
         ]);
       });
     });
@@ -118,7 +126,7 @@ describe('teleporteos', async () => {
         );
       });
     });
-    context('with registered oracle', async () => {
+    context('with registered oracle3', async () => {
       context('with wrong auth', async () => {
         it('should fail with auth error', async () => {
           await assertMissingAuthority(
@@ -167,7 +175,7 @@ describe('teleporteos', async () => {
         });
       });
     });
-    context('with another registered oracle', async () => {
+    context('with another registered oracle1', async () => {
       it('should add another receipt to existing', async () => {
         await teleporteos.received(
           oracle1.name,
@@ -236,8 +244,8 @@ describe('teleporteos', async () => {
         );
       });
     });
-    context('with 3 full approvals', async () => {
-      it('should succeed', async () => {
+    context('with 5 full approvals', async () => {
+      before(async () => {
         await teleporteos.received(
           oracle2.name,
           sender1.name,
@@ -247,6 +255,29 @@ describe('teleporteos', async () => {
           true,
           {
             from: oracle2,
+          }
+        );
+
+        await teleporteos.received(
+          oracle4.name,
+          sender1.name,
+          '1111111111111111111111111111111111111111111111111111111111111111',
+          '123.0000 TLM',
+          2,
+          true,
+          {
+            from: oracle4,
+          }
+        );
+        await teleporteos.received(
+          oracle5.name,
+          sender1.name,
+          '1111111111111111111111111111111111111111111111111111111111111111',
+          '123.0000 TLM',
+          2,
+          true,
+          {
+            from: oracle5,
           }
         );
       });
@@ -263,10 +294,16 @@ describe('teleporteos', async () => {
       it('should update receipt table', async () => {
         await assertRowsEqual(teleporteos.receiptsTable(), [
           {
-            approvers: [oracle1.name, oracle2.name, oracle3.name],
+            approvers: [
+              oracle1.name,
+              oracle2.name,
+              oracle3.name,
+              oracle4.name,
+              oracle5.name,
+            ],
             chain_id: 2,
             completed: true,
-            confirmations: 3,
+            confirmations: 5,
             date: new Date(),
             id: 0,
             quantity: '123.0000 TLM',
@@ -348,10 +385,16 @@ describe('teleporteos', async () => {
         it('should update the receipts table', async () => {
           await assertRowsEqual(teleporteos.receiptsTable(), [
             {
-              approvers: [oracle1.name, oracle2.name, oracle3.name],
+              approvers: [
+                oracle1.name,
+                oracle2.name,
+                oracle3.name,
+                oracle4.name,
+                oracle5.name,
+              ],
               chain_id: 2,
               completed: true,
-              confirmations: 3,
+              confirmations: 5,
               date: new Date(),
               id: 0,
               quantity: '123.0000 TLM',
@@ -380,8 +423,7 @@ describe('teleporteos', async () => {
         await assertMissingAuthority(
           teleporteos.teleport(sender1.name, '123.0000 TLM', 2, ethToken, {
             from: sender2,
-          }),
-          ''
+          })
         );
       });
     });
@@ -472,11 +514,153 @@ describe('teleporteos', async () => {
       });
     });
   });
+  context('refund receipt', async () => {
+    context('without valid auth', async () => {
+      it('should fail with auth error', async () => {
+        await assertMissingAuthority(
+          teleporteos.refundrec(
+            0,
+            '2222222222222222222222222222222222222222222222222222222222222222',
+            { from: oracle1 }
+          )
+        );
+      });
+    });
+    context('with non-exitent receipt', async () => {
+      it('should fail with non-existing error', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.refundrec(
+            10,
+            '2222222222222222222222222222222222222222222222222222222222222222',
+            { from: teleporteos.account }
+          ),
+          'Receipt not found'
+        );
+      });
+    });
+    context('for a completed receipt', async () => {
+      it('should fail with completed error', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.refundrec(
+            0,
+            '2222222222222222222222222222222222222222222222222222222222222222',
+            { from: teleporteos.account }
+          ),
+          'Receipt has already been completed'
+        );
+      });
+    });
+    context('for a receipt with not enough confirmations', async () => {
+      it('should fail with not enough confirmations error', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.refundrec(
+            1,
+            '2222222222222222222222222222222222222222222222222222222222222222',
+            { from: teleporteos.account }
+          ),
+          'Not enough confirmations'
+        );
+      });
+    });
+    context('for a receipt with enough confirmations', async () => {
+      before(async () => {
+        await teleporteos.received(
+          oracle1.name,
+          '',
+          '1111111111111111111111111111111111111111111111111111111111111113',
+          '666.0000 TLM',
+          2,
+          true,
+          {
+            from: oracle1,
+          }
+        );
+        await teleporteos.received(
+          oracle2.name,
+          '',
+          '1111111111111111111111111111111111111111111111111111111111111113',
+          '666.0000 TLM',
+          2,
+          true,
+          {
+            from: oracle2,
+          }
+        );
+        await teleporteos.received(
+          oracle3.name,
+          '',
+          '1111111111111111111111111111111111111111111111111111111111111113',
+          '666.0000 TLM',
+          2,
+          true,
+          {
+            from: oracle3,
+          }
+        );
+        await teleporteos.received(
+          oracle4.name,
+          '',
+          '1111111111111111111111111111111111111111111111111111111111111113',
+          '666.0000 TLM',
+          2,
+          true,
+          {
+            from: oracle4,
+          }
+        );
+      });
+      it('last oracle should fail due to inline transfer', async () => {
+        await assertEOSErrorIncludesMessage(
+          teleporteos.received(
+            oracle5.name,
+            '',
+            '1111111111111111111111111111111111111111111111111111111111111113',
+            '666.0000 TLM',
+            2,
+            true,
+            {
+              from: oracle5,
+            }
+          ),
+          'to account does not exist'
+        );
+      });
+      it('should succeed', async () => {
+        teleporteos.refundrec(
+          2,
+          '2222222222222222222222222222222222222222222222222222222222222222',
+          { from: teleporteos.account }
+        );
+      });
+      it('should update receipts table', async () => {
+        let { rows } = await teleporteos.receiptsTable();
+        let item = rows[2];
+
+        chai.expect(item.id).equal(2);
+        chai.expect(item.to).equal('');
+
+        chai.expect(item.chain_id).equal(2);
+        chai.expect(item.approvers.length).equal(4);
+      });
+      it('should insert a teleport into the table', async () => {
+        let { rows } = await teleporteos.teleportsTable();
+        let item = rows[1];
+        chai.expect(item.id).equal(1);
+        chai.expect(item.chain_id).equal(2);
+        chai.expect(item.quantity).equal('666.0000 TLM');
+        chai
+          .expect(item.eth_address)
+          .equal(
+            '2222222222222222222222222222222222222222222222222222222222222222'
+          );
+      });
+    });
+  });
 });
 
 async function seedAccounts() {
   teleporteos = await ContractDeployer.deployWithName<Teleporteos>(
-    'contracts/teleport/teleporteos',
+    'contracts/teleporteos/teleporteos',
     'teleporteos'
   );
 
@@ -490,7 +674,9 @@ async function seedAccounts() {
   oracle1 = await AccountManager.createAccount('oracle1');
   oracle2 = await AccountManager.createAccount('oracle2');
   oracle3 = await AccountManager.createAccount('oracle3');
+  removedOracle = await AccountManager.createAccount('remoracle');
   oracle4 = await AccountManager.createAccount('oracle4');
+  oracle5 = await AccountManager.createAccount('oracle5');
 
   await issueTokens();
   await updateAuths();
@@ -544,7 +730,7 @@ async function issueTokens() {
         from: alienworldsToken.account,
       }
     );
-  } catch (e) {
+  } catch (e: any) {
     if (e.json.error.what != 'eosio_assert_message assertion failure') {
       throw e;
     }

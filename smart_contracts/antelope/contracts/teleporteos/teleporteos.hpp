@@ -96,8 +96,8 @@ public:
   teleporteos(name s, name code, datastream<const char *> ds);
 
   /* Fungible token transfer (only trilium) */
-  [[eosio::on_notify(TOKEN_CONTRACT_STR "::transfer")]] void transfer(
-      name from, name to, asset quantity, string memo);
+  [[eosio::on_notify(TOKEN_CONTRACT_STR "::transfer")]] void
+  transfer(name from, name to, asset quantity, string memo);
 
   ACTION teleport(name from, asset quantity, uint8_t chain_id,
                   checksum256 eth_address);
@@ -106,6 +106,9 @@ public:
   ACTION sign(name oracle_name, uint64_t id, string signature);
   ACTION repairrec(uint64_t id, asset quantity, vector<name> approvers,
                    bool completed);
+  ACTION refundrec(uint64_t id, checksum256 eth_address);
+  ACTION injecttel(name from, checksum256 eth_address, asset quantity,
+                   uint8_t chain_id);
   ACTION withdraw(name from, asset quantity);
   ACTION cancel(uint64_t id);
   ACTION received(name oracle_name, name to, checksum256 ref, asset quantity,
@@ -117,5 +120,9 @@ public:
   ACTION sign(string signature);
   ACTION delreceipts();
   ACTION delteles();
+
+private:
+  void _add_teleport(name from, checksum256 eth_address, asset quantity,
+                     uint8_t chain_id);
 };
 } // namespace alienworlds

@@ -69,9 +69,39 @@ void teleporteos::teleport(name from, asset quantity, uint8_t chain_id,
                      [&](auto &d) { d.quantity -= quantity; });
   }
 
+  _add_teleport(from, eth_address, quantity, chain_id);
+}
+
+void teleporteos::refundrec(uint64_t id, checksum256 eth_address) {
+  require_auth(get_self());
+
+  auto existing_receipt = _receipts.require_find(id, "Receipt not found");
+
+  check(!existing_receipt->completed, "Receipt has already been completed");
+  check(existing_receipt->confirmations >=
+            ORACLE_CONFIRMATIONS -
+                1, // Expect all oracles execpt for hte last one to succeed in
+                   // signing. The last one will be missing because the inline
+                   // transfer will fail causing the whole sign action to fail
+        "Not enough confirmations to refund. Required: 4");
+  _receipts.modify(*existing_receipt, get_self(),
+                   [&](auto &r) { r.completed = true; });
+
+  _add_teleport(get_self(), eth_address, existing_receipt->quantity,
+                existing_receipt->chain_id);
+}
+
+void teleporteos::injecttel(name from, checksum256 eth_address, asset quantity,
+                            uint8_t chain_id) {
+  require_auth(get_self());
+  _add_teleport(from, eth_address, quantity, chain_id);
+}
+
+void teleporteos::_add_teleport(name from, checksum256 eth_address,
+                                asset quantity, uint8_t chain_id) {
   uint64_t next_teleport_id = _teleports.available_primary_key();
   uint32_t now = current_time_point().sec_since_epoch();
-  _teleports.emplace(from, [&](auto &t) {
+  _teleports.emplace(get_self(), [&](auto &t) {
     t.id = next_teleport_id;
     t.time = now;
     t.account = from;

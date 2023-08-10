@@ -106,6 +106,8 @@ public:
   ACTION sign(name oracle_name, uint64_t id, string signature);
   ACTION repairrec(uint64_t id, asset quantity, vector<name> approvers,
                    bool completed);
+  ACTION repairtel(uint64_t id, optional<name> from, optional<asset> quantity,
+                   uint8_t chain_id, optional<checksum256> eth_address);
   ACTION refundrec(uint64_t id, checksum256 eth_address);
   ACTION injecttel(name from, checksum256 eth_address, asset quantity,
                    uint8_t chain_id);

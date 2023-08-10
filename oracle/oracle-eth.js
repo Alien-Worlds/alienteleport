@@ -25,6 +25,7 @@ const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder()
 
 const network = config.network || 'ETH'
 const blocks_file = `.oracle_${config.network}_block-${config.eth.oracleAccount}`;
+const chain_id = Number.parseInt(config.eth.chidId);
 const DEFAULT_BLOCKS_TO_WAIT = 5;
 const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
 const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
@@ -167,7 +168,6 @@ const process_teleported = async (from_block, to_block) => {
                         continue;
                     }
                     const to = data[0];
-                    const chain_id = data[2].toNumber();
                     const amount = (tokens / Math.pow(10, config.precision)).toFixed(config.precision);
                     const quantity = `${amount} ${config.symbol}`
                     const txid = res[r].transactionHash.replace(/^0x/, '');

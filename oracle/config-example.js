@@ -17,6 +17,7 @@ module.exports = {
         wsEndpoint: 'wss://<oracle-specific>', // Should be changed to suit the oracle
         endpoint: 'https://<oracle-specific>', // Should be changed to suit the oracle
         oracleAccount: '0x111111111111111111111111111111111111111', // Should be changed to suit the oracle
-        privateKey: 'ABC434DCF...' // Should be changed to suit the oracle to match th oracle account used on the EVM chain.
+        privateKey: 'ABC434DCF...', // Should be changed to suit the oracle to match th oracle account used on the EVM chain.
+        chainId: 2 // This is the chainId for BSC. 1 is for ETH
     }
 }

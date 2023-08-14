@@ -246,6 +246,28 @@ void teleporteos::repairrec(uint64_t id, asset quantity, vector<name> approvers,
   });
 }
 
+void teleporteos::repairtel(uint64_t id, optional<name> from,
+                            optional<asset> quantity, uint8_t chain_id,
+                            optional<checksum256> eth_address) {
+  require_auth(get_self());
+
+  auto existing = _teleports.require_find(id, "Teleport does not exist.");
+
+  _teleports.modify(existing, same_payer, [&](auto &t) {
+    if (from.has_value())
+      t.account = from.value();
+
+    if (quantity.has_value()) {
+      check(quantity.value().amount > 0, "Quantity cannot be negative");
+      check(quantity.value().is_valid(), "Asset not valid");
+      t.quantity = quantity.value();
+    }
+    t.chain_id = chain_id;
+    if (eth_address.has_value())
+      t.eth_address = eth_address.value();
+  });
+}
+
 /*
  * Marks a teleport as claimed
  */

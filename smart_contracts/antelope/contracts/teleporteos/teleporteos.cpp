@@ -265,6 +265,9 @@ void teleporteos::repairtel(uint64_t id, optional<name> from,
     t.chain_id = chain_id;
     if (eth_address.has_value())
       t.eth_address = eth_address.value();
+
+    t.oracles = {};
+    t.signatures = {};
   });
 }
 

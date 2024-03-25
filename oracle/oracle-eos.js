@@ -48,8 +48,8 @@ class TraceHandler {
         }
 
         this.processingQueue = true;
-        console.log(this.queue.length + ' items in the queue')
         const item = this.queue.pop();
+        console.log(`TeleportId: ${item.data.id}; ${this.queue.length} items in the queue`);
         console.log(`Process item ${JSON.stringify(item)}`);
 
         const data = item.data;
@@ -87,7 +87,7 @@ class TraceHandler {
             // console.log(pk, sig);
 
             const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
-            console.log(`Created signature ${signature}`);
+            console.log(`TeleportId: ${data.id}; Created signature ${signature}`);
 
             const actions = [{
                 account: config.eos.teleportContract,
@@ -120,7 +120,7 @@ class TraceHandler {
     }
 
     async sendSignature(data, data_serialized, retries = 0) {
-        console.log(data, data_serialized, Buffer.from(data_serialized).toString('hex'));
+        //console.log(data, data_serialized, Buffer.from(data_serialized).toString('hex'));
         this.queue.push({ data, data_serialized, retries });
 
         // verify signature
@@ -145,7 +145,7 @@ class TraceHandler {
                             case 'action_trace_v1':
                                 if (action[1].act.account === this.config.eos.teleportContract && action[1].act.name === 'logteleport') {
                                     const action_deser = await eos_api.deserializeActions([action[1].act]);
-                                    console.log(`Sending ${action_deser[0].data.quantity} to ${action_deser[0].data.eth_address}`, action_deser[0].data);
+                                    console.log(`TeleportId: ${action_deser[0].data.id}, Sending ${action_deser[0].data.quantity} from ${action_deser[0].data.from} to ${action_deser[0].data.eth_address}`);
                                     this.sendSignature(action_deser[0].data, action[1].act.data);
                                 }
                                 break;
@@ -196,7 +196,7 @@ const run = async (config) => {
             console.log(`Pushed confirmation with txid ${json.txid}`);
         }
         else if (json.type === 'error') {
-            console.error(`Error pushing signature ${json.message}`);
+            console.error(`TeleportId: ${json.actions[0].data.id}; Error pushing signature ${json.message}`);
             setTimeout(() => {
                 tx_dispatcher.send(JSON.stringify(json.actions));
             }, 1000);

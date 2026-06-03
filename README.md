@@ -39,9 +39,107 @@ Successfully registered oracles can then call the received function on each cont
 2. Change the configuration settings to match your tokens
 3. Start the oracle using the following command `CONFIG=./[path/to/config] oracle-eos|eth.js`
 
+## Transfer limits
+
+The following limits are hardcoded in the contracts (not configurable at runtime):
+
+* **Minimum transfer: 100 TLM** — enforced on the Antelope side in `teleporteos.cpp` in both the incoming `transfer` notification (deposits below 100 TLM are rejected) and the `teleport` action itself. There is no minimum-amount check on the EVM side.
+* **Oracle signature threshold (EVM):** defaults to `3` in `TeleportToken.sol` and is capped at a **maximum of 10** via `updateThreshold`. The `claim` function rejects any teleport whose unique valid signatures are below the current threshold.
+* There is **no per-transaction maximum, no daily cap, and no rate limiting** in either contract.
+
+Changing the minimum amount or the EVM threshold cap requires a contract change and redeploy. Oracle set membership and the Antelope-side signature threshold are managed via on-chain state/config rather than hardcoded constants.
+
 ## Sequence:
 
 ![](./doc_media/sequence-diagram.png)
+
+### TLM flow: Antelope → EVM
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (WAX account)
+    participant TLM as alien.worlds (TLM token, WAX)
+    participant EOS as teleporteos (WAX)
+    participant Oracles as Oracle scripts<br/>(oracle-eos.js → sign path)
+    participant EVM as TeleportToken.sol (EVM chain)
+    actor Recipient as Recipient (EVM address)
+
+    Note over User,EOS: Typically bundled in one atomic tx
+
+    User->>TLM: transfer(user → teleporteos, quantity, "")
+    TLM-->>EOS: on_notify transfer(...)
+    Note over EOS: check quantity ≥ 100 TLM<br/>upsert deposits[user] += quantity
+
+    User->>EOS: teleport(user, quantity, chain_id, eth_address)
+    Note over EOS: check quantity ≥ 100 TLM<br/>deposits[user] -= quantity<br/>(tokens stay locked in contract)
+    EOS->>EOS: _add_teleport(): insert teleports row<br/>(id, time, account, quantity, chain_id, eth_address)
+    EOS-->>EOS: inline action logteleport(id, ts, …)<br/>(emits action for oracles to watch)
+
+    loop For each registered oracle
+        Oracles->>EOS: SHiP listener picks up logteleport
+        Oracles->>Oracles: build signed payload<br/>(id, ts, fromAddr, quantity,<br/>symbolRaw, chainId, toAddress)<br/>sign with oracle eth key
+        Oracles->>EOS: action sign(oracle, id, signature)
+        Note over EOS: append to teleports[id].oracles<br/>+ signatures (dedup by oracle name)
+    end
+
+    Recipient->>EOS: read teleports[id] (off-chain query)<br/>collect ≥ threshold signatures
+    Recipient->>EVM: claim(sigData, signatures[])
+    Note over EVM: verifySigData:<br/>• chainId == thisChainId<br/>• now < ts + 30 days<br/>• !claimed[id] → mark claimed
+    Note over EVM: for each sig: ecrecover →<br/>count if oracles[addr] && !signed[id][addr]<br/>require numberSigs ≥ threshold (default 3)
+    EVM->>EVM: balances[address(0)] -= quantity<br/>balances[toAddress] += quantity
+    EVM-->>Recipient: TLM credited
+    EVM-->>EVM: emit Claimed(id, to, tokens)<br/>topic 0xf20f…7b17
+
+    loop For each registered oracle
+        Oracles->>EVM: poll new blocks, filter Claimed topic
+        Oracles->>EOS: action claimed(oracle, id, to_eth, quantity)
+        Note over EOS: validates match, sets<br/>teleports[id].claimed = true
+    end
+
+    alt Not claimed within 30 days
+        User->>EOS: cancel(id) after 30 days
+        EOS->>TLM: transfer(self → user, quantity, "Cancel teleport")
+        TLM->>User: TLM refunded
+        Note over EOS: cancels row added, teleport row remains<br/>claimed flag never flips
+    end
+```
+
+### TLM flow: EVM → Antelope
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User (EVM wallet)
+    participant EVM as TeleportToken.sol (EVM chain)
+    participant Oracles as Oracle scripts<br/>(oracle-eth.js → oracle-eos.js sign path)
+    participant EOS as teleporteos (WAX)
+    participant TLM as alien.worlds (TLM token, WAX)
+    actor Recipient as Recipient (WAX account)
+
+    User->>EVM: teleport(toWaxAccount, tokens, chainId)
+    Note over EVM: balances[msg.sender] -= tokens<br/>balances[address(0)] += tokens<br/>(tokens locked in burn pool)
+    EVM-->>EVM: emit Teleport(from, to, tokens, chainId)<br/>topic 0x6228…f5d5
+
+    loop For each registered oracle (≥ ORACLE_CONFIRMATIONS = 5)
+        Oracles->>EVM: poll new blocks, filter Teleport topic
+        Oracles->>Oracles: decode (recipient, chainId, quantity, tx_id)<br/>wait for finality
+        Oracles->>EOS: action received(oracle, to, ref=tx_id,<br/>quantity, chain_id, confirmed=true)
+    end
+
+    Note over EOS: 1st received() call creates receipt_item<br/>(defines canonical to/quantity/ref)
+    Note over EOS: subsequent calls validate match,<br/>append approver, increment confirmations
+
+    EOS->>EOS: confirmations reach ORACLE_CONFIRMATIONS − 1 (=4)
+    EOS->>TLM: inline transfer(self → to, quantity, "Teleport")
+    TLM->>Recipient: TLM credited
+    EOS->>EOS: receipt.completed = true<br/>final oracle increments confirmations to 5
+
+    alt Inline transfer fails (e.g. account missing)
+        EOS-->>Oracles: 5th oracle's action aborts<br/>receipt stuck at 4 confirmations
+        Note over EOS: Recovery: federation calls<br/>refundrec(id, eth_address)<br/>→ creates compensating teleport back
+    end
+```
 
 ---
 ## Inner technical details

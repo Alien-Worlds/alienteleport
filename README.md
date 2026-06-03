@@ -51,8 +51,6 @@ Changing the minimum amount or the EVM threshold cap requires a contract change 
 
 ## Sequence:
 
-![](./doc_media/sequence-diagram.png)
-
 ### TLM flow: Antelope → EVM
 
 ```mermaid

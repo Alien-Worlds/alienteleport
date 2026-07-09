@@ -38,52 +38,105 @@ const fetch = require('node-fetch');
 const config = require(config_file);
 const rpc = new JsonRpc(config.eos.endpoint, { fetch });
 
-function parseArgs(argv) {
-  const chainEnv = process.env.CHAIN_ID;
-  let chainId = null; // default: all chains
-  if (chainEnv !== undefined && chainEnv !== '' && chainEnv !== 'all') {
-    chainId = parseInt(chainEnv, 10);
+/**
+ * Parse a finite integer. Rejects empty/non-numeric so NaN cannot silently
+ * zero out pages or break the watch interval.
+ */
+function parseFiniteInt(value, name, { min, max } = {}) {
+  if (value === undefined || value === null || value === '') {
+    throw new Error(`${name} is required`);
   }
+  const raw = String(value).trim();
+  if (!/^-?\d+$/.test(raw)) {
+    throw new Error(`Invalid ${name}: ${JSON.stringify(value)} (expected integer)`);
+  }
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) {
+    throw new Error(`Invalid ${name}: ${JSON.stringify(value)}`);
+  }
+  if (min !== undefined && n < min) {
+    throw new Error(`${name} must be >= ${min} (got ${n})`);
+  }
+  if (max !== undefined && n > max) {
+    throw new Error(`${name} must be <= ${max} (got ${n})`);
+  }
+  return n;
+}
 
+function parseOptionalFiniteInt(value, name, bounds) {
+  if (value === undefined || value === null || value === '') return undefined;
+  return parseFiniteInt(value, name, bounds);
+}
+
+function parseArgs(argv) {
   const args = {
     once: false,
     json: false,
     allChains: true,
-    interval: parseInt(process.env.INTERVAL_SEC || '300', 10),
-    sigThreshold: parseInt(process.env.SIG_THRESHOLD || '3', 10),
-    receiptThreshold: parseInt(process.env.RECEIPT_THRESHOLD || '5', 10),
-    minAgeSec: parseInt(process.env.MIN_AGE_SEC || '120', 10),
-    pages: parseInt(process.env.PAGES || '100', 10),
-    chainId,
+    interval: 300,
+    sigThreshold: 3,
+    receiptThreshold: 5,
+    minAgeSec: 120,
+    pages: 100,
+    chainId: null, // default: all chains
     hyperion: process.env.HYPERION || '',
   };
 
-  for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--once') args.once = true;
-    else if (a === '--json') args.json = true;
-    else if (a === '--watch') args.once = false;
-    else if (a === '--all-chains') {
-      args.allChains = true;
-      args.chainId = null;
-    } else if (a === '--interval' && argv[i + 1]) args.interval = parseInt(argv[++i], 10);
-    else if (a === '--sig-threshold' && argv[i + 1]) args.sigThreshold = parseInt(argv[++i], 10);
-    else if (a === '--receipt-threshold' && argv[i + 1])
-      args.receiptThreshold = parseInt(argv[++i], 10);
-    else if (a === '--min-age' && argv[i + 1]) args.minAgeSec = parseInt(argv[++i], 10);
-    else if (a === '--pages' && argv[i + 1]) args.pages = parseInt(argv[++i], 10);
-    else if (a === '--chain-id' && argv[i + 1]) {
-      const v = argv[++i];
-      if (v === 'all') {
-        args.chainId = null;
+  try {
+    const envInterval = parseOptionalFiniteInt(process.env.INTERVAL_SEC, 'INTERVAL_SEC', { min: 1 });
+    if (envInterval !== undefined) args.interval = envInterval;
+
+    const envSig = parseOptionalFiniteInt(process.env.SIG_THRESHOLD, 'SIG_THRESHOLD', { min: 1 });
+    if (envSig !== undefined) args.sigThreshold = envSig;
+
+    const envReceipt = parseOptionalFiniteInt(process.env.RECEIPT_THRESHOLD, 'RECEIPT_THRESHOLD', {
+      min: 1,
+    });
+    if (envReceipt !== undefined) args.receiptThreshold = envReceipt;
+
+    const envMinAge = parseOptionalFiniteInt(process.env.MIN_AGE_SEC, 'MIN_AGE_SEC', { min: 0 });
+    if (envMinAge !== undefined) args.minAgeSec = envMinAge;
+
+    const envPages = parseOptionalFiniteInt(process.env.PAGES, 'PAGES', { min: 1 });
+    if (envPages !== undefined) args.pages = envPages;
+
+    const chainEnv = process.env.CHAIN_ID;
+    if (chainEnv !== undefined && chainEnv !== '' && chainEnv !== 'all') {
+      args.chainId = parseFiniteInt(chainEnv, 'CHAIN_ID', { min: 0 });
+      args.allChains = false;
+    }
+
+    for (let i = 2; i < argv.length; i++) {
+      const a = argv[i];
+      if (a === '--once') args.once = true;
+      else if (a === '--json') args.json = true;
+      else if (a === '--watch') args.once = false;
+      else if (a === '--all-chains') {
         args.allChains = true;
-      } else {
-        args.chainId = parseInt(v, 10);
-        args.allChains = false;
-      }
-    } else if (a === '--hyperion' && argv[i + 1]) args.hyperion = argv[++i];
-    else if (a === '--help' || a === '-h') {
-      console.log(`Usage: CONFIG=./config.js node monitor-teleports.js [options]
+        args.chainId = null;
+      } else if (a === '--interval' && argv[i + 1]) {
+        args.interval = parseFiniteInt(argv[++i], '--interval', { min: 1 });
+      } else if (a === '--sig-threshold' && argv[i + 1]) {
+        args.sigThreshold = parseFiniteInt(argv[++i], '--sig-threshold', { min: 1 });
+      } else if (a === '--receipt-threshold' && argv[i + 1]) {
+        args.receiptThreshold = parseFiniteInt(argv[++i], '--receipt-threshold', { min: 1 });
+      } else if (a === '--min-age' && argv[i + 1]) {
+        args.minAgeSec = parseFiniteInt(argv[++i], '--min-age', { min: 0 });
+      } else if (a === '--pages' && argv[i + 1]) {
+        args.pages = parseFiniteInt(argv[++i], '--pages', { min: 1 });
+      } else if (a === '--chain-id' && argv[i + 1]) {
+        const v = argv[++i];
+        if (v === 'all') {
+          args.chainId = null;
+          args.allChains = true;
+        } else {
+          args.chainId = parseFiniteInt(v, '--chain-id', { min: 0 });
+          args.allChains = false;
+        }
+      } else if (a === '--hyperion' && argv[i + 1]) {
+        args.hyperion = argv[++i];
+      } else if (a === '--help' || a === '-h') {
+        console.log(`Usage: CONFIG=./config.js node monitor-teleports.js [options]
 
 Options:
   --once                  Single scan, then exit with status code
@@ -98,17 +151,30 @@ Options:
   --pages <n>             Max pages of 100 rows per table (default 100)
   --hyperion <url>        Hyperion base for block_num hints
 `);
-      process.exit(0);
+        process.exit(0);
+      } else if (a.startsWith('--')) {
+        throw new Error(`Unknown option: ${a}`);
+      }
     }
+  } catch (e) {
+    console.error(`Config error: ${e.message}`);
+    process.exit(3);
   }
+
   return args;
 }
 
-/** Forward scan using next_key (reliable for large tables). Newest-first via reverse. */
+/**
+ * Newest-first scan via reverse=true.
+ * For reverse pagination, continue with upper_bound (not lower_bound) so we
+ * walk downward without duplicating the last row of the previous page.
+ * Chain upper_bound is exclusive for get_table_rows.
+ */
 async function fetchTable(table, pages) {
   const rows = [];
-  let lower_bound;
-  let next_key;
+  const seen = new Set();
+  let upper_bound;
+
   for (let page = 0; page < pages; page++) {
     const params = {
       code: config.eos.teleportContract,
@@ -117,27 +183,32 @@ async function fetchTable(table, pages) {
       limit: 100,
       reverse: true,
     };
-    if (next_key !== undefined && next_key !== null && next_key !== '') {
-      // continue reverse pagination from next_key when API provides it
-      params.lower_bound = next_key;
-    } else if (lower_bound !== undefined) {
-      params.upper_bound = lower_bound;
+    if (upper_bound !== undefined && upper_bound !== null && upper_bound !== '') {
+      params.upper_bound = upper_bound;
     }
+
     const res = await rpc.get_table_rows(params);
     if (!res.rows || !res.rows.length) break;
-    rows.push(...res.rows);
+
+    for (const row of res.rows) {
+      const key = String(row.id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(row);
+    }
+
     if (!res.more) break;
+
     const last = res.rows[res.rows.length - 1];
-    // Prefer API next_key; fall back to exclusive upper bound on last id for reverse
+    // Prefer API next_key as the next exclusive upper bound for reverse walks.
     if (res.next_key !== undefined && res.next_key !== null && res.next_key !== '') {
-      next_key = res.next_key;
-      lower_bound = undefined;
+      upper_bound = res.next_key;
     } else {
-      next_key = undefined;
-      lower_bound = last.id;
+      upper_bound = last.id;
     }
     if (last.id === 0 || last.id === '0') break;
   }
+
   return rows;
 }
 

@@ -154,12 +154,15 @@ async function collectReaders() {
     const source = fromFile != null ? 'cursor_file' : fromLog != null ? 'log' : 'none';
     const pm = pm2ByName[spec.name] || null;
     const lag = waxHead != null && current != null ? Math.max(0, waxHead - current) : null;
+    // WAX ~0.5s blocks: treat ≤1000 (~8 min irreversible buffer / SHiP delay) as synced.
+    // Only surface catching_up/lagging when truly behind.
+    const WAX_SYNC_LAG = Number(process.env.WAX_SYNC_LAG_BLOCKS || 1000);
+    const WAX_CATCHUP_LAG = Number(process.env.WAX_CATCHUP_LAG_BLOCKS || 10000);
     let health = 'unknown';
     if (pm && pm.status === 'online') {
       if (lag == null) health = 'online';
-      else if (lag <= 50) health = 'synced';
-      else if (lag <= 500) health = 'catching_up';
-      else if (lag <= 5000) health = 'catching_up';
+      else if (lag <= WAX_SYNC_LAG) health = 'synced';
+      else if (lag <= WAX_CATCHUP_LAG) health = 'catching_up';
       else health = 'lagging';
     } else if (pm && pm.status) health = pm.status;
     else health = 'not_found';
@@ -175,6 +178,7 @@ async function collectReaders() {
       chain_head: waxHead,
       lag_blocks: lag,
       health,
+      lag_thresholds: { synced_max: WAX_SYNC_LAG, catching_up_max: WAX_CATCHUP_LAG },
     };
   });
 

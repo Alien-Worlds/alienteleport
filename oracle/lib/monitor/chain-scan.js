@@ -190,6 +190,10 @@ async function scan(opts) {
     collectReaders(),
   ]);
 
+  // Mark readers snapshot time for the HTTP layer
+  const { live } = require('./context');
+  live.last_readers_at = new Date().toISOString();
+
   const t = analyseTeleports(teleports, opts, nowSec, me);
   const r = analyseReceipts(receipts, opts, nowSec, me);
 

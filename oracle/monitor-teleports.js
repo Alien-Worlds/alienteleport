@@ -551,34 +551,173 @@ function publicReceiptItem(x) {
   };
 }
 
+const CHAIN_NAMES = {
+  0: 'legacy/unknown',
+  1: 'Ethereum',
+  2: 'BSC',
+};
+
+function chainLabel(id) {
+  const n = Number(id);
+  return CHAIN_NAMES[n] != null ? `${CHAIN_NAMES[n]} (${n})` : `chain ${id}`;
+}
+
+function formatAge(sec) {
+  if (sec == null || sec === '') return '—';
+  const s = Number(sec);
+  if (!Number.isFinite(s) || s < 0) return String(sec);
+  if (s < 120) return `${Math.floor(s)}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  const d = Math.floor(s / 86400);
+  if (d < 60) return `${d}d`;
+  if (d < 365) return `${Math.floor(d / 30)}mo`;
+  return `${(d / 365).toFixed(1)}y`;
+}
+
+/**
+ * Derive a specific operational status (not a vague "degraded").
+ * Codes are stable for API consumers; labels/details are human-readable.
+ */
+function deriveStatus(report) {
+  if (live.last_error) {
+    return {
+      status: 'scan_error',
+      status_label: 'Scan error',
+      status_detail: `Chain scan failed: ${live.last_error}`,
+      severity: 'critical',
+      reasons: [{ code: 'scan_error', message: live.last_error }],
+    };
+  }
+  if (!report) {
+    return {
+      status: 'starting',
+      status_label: 'Starting up',
+      status_detail: 'Waiting for the first chain scan to finish.',
+      severity: 'info',
+      reasons: [],
+    };
+  }
+
+  const missT = report.missing_for_this_oracle.antelope_to_evm;
+  const missR = report.missing_for_this_oracle.evm_to_antelope;
+  const sysT = report.system_incomplete.antelope_to_evm;
+  const sysR = report.system_incomplete.evm_to_antelope;
+  // Incomplete where this oracle already participated (others / stuck quorum)
+  const stuckT = sysT.filter((x) => x.this_oracle_signed);
+  const stuckR = sysR.filter((x) => x.this_oracle_approved);
+
+  const reasons = [];
+  if (missT.length) {
+    reasons.push({
+      code: 'oracle_missing_signatures',
+      message: `This oracle has not signed ${missT.length} Antelope→EVM teleport(s) still below signature quorum.`,
+      count: missT.length,
+      direction: 'antelope_to_evm',
+    });
+  }
+  if (missR.length) {
+    reasons.push({
+      code: 'oracle_missing_approvals',
+      message: `This oracle has not approved ${missR.length} EVM→Antelope receipt(s) that are still incomplete.`,
+      count: missR.length,
+      direction: 'evm_to_antelope',
+    });
+  }
+  if (stuckT.length) {
+    reasons.push({
+      code: 'stuck_teleports',
+      message: `${stuckT.length} Antelope→EVM teleport(s) still below quorum after this oracle signed (waiting on other oracles or stuck).`,
+      count: stuckT.length,
+      direction: 'antelope_to_evm',
+    });
+  }
+  if (stuckR.length) {
+    reasons.push({
+      code: 'stuck_receipts',
+      message: `${stuckR.length} EVM→Antelope receipt(s) still incomplete after this oracle approved (waiting on other oracles or historically stuck).`,
+      count: stuckR.length,
+      direction: 'evm_to_antelope',
+    });
+  }
+
+  const miss = missT.length + missR.length;
+  const stuck = stuckT.length + stuckR.length;
+
+  if (miss > 0 && stuck > 0) {
+    return {
+      status: 'oracle_action_and_stuck',
+      status_label: 'Action needed + stuck items',
+      status_detail: `This oracle is missing on ${miss} item(s). Separately, ${stuck} item(s) remain incomplete even after this oracle participated.`,
+      severity: 'critical',
+      reasons,
+    };
+  }
+  if (missT.length && missR.length) {
+    return {
+      status: 'oracle_action_needed',
+      status_label: 'Oracle action needed',
+      status_detail: `Missing ${missT.length} Antelope→EVM signature(s) and ${missR.length} EVM→Antelope approval(s). Restart/catch up oracle-eos and oracle-eth as needed.`,
+      severity: 'critical',
+      reasons,
+    };
+  }
+  if (missT.length) {
+    return {
+      status: 'oracle_missing_signatures',
+      status_label: 'Missing teleport signatures',
+      status_detail: `This oracle has not signed ${missT.length} Antelope→EVM teleport(s). Check the WAX SHiP reader (oracle-eos) and replay from a block before the gap if needed.`,
+      severity: 'critical',
+      reasons,
+    };
+  }
+  if (missR.length) {
+    return {
+      status: 'oracle_missing_approvals',
+      status_label: 'Missing receipt approvals',
+      status_detail: `This oracle has not approved ${missR.length} EVM→Antelope receipt(s). Check the EVM watcher (oracle-eth) is running and caught up.`,
+      severity: 'critical',
+      reasons,
+    };
+  }
+  if (stuck > 0) {
+    return {
+      status: 'stuck_bridge_items',
+      status_label: 'Stuck bridge items',
+      status_detail: `${stuck} incomplete item(s) remain where this oracle already participated — usually waiting on other oracles or old historically stuck rows.`,
+      severity: 'warning',
+      reasons,
+    };
+  }
+
+  return {
+    status: 'ok',
+    status_label: 'All clear',
+    status_detail: 'No incomplete teleports/receipts requiring attention in the scan window.',
+    severity: 'ok',
+    reasons: [],
+  };
+}
+
 /**
  * Strip anything that could leak ops secrets (RPC URLs, keys, file paths).
  * Output is safe to expose on a public status page.
  */
 function toPublicStatus() {
   const report = live.report;
-  const healthy =
-    live.last_error == null &&
-    report != null &&
-    report.missing_for_this_oracle.count === 0 &&
-    report.system_incomplete.count === 0;
-
-  const level =
-    live.last_error != null
-      ? 'error'
-      : report == null
-        ? 'starting'
-        : report.missing_for_this_oracle.count > 0
-          ? 'degraded'
-          : report.system_incomplete.count > 0
-            ? 'warning'
-            : 'ok';
+  const derived = deriveStatus(report);
+  const healthy = derived.status === 'ok';
 
   const base = {
     service: 'alienteleport-oracle-monitor',
-    version: 1,
+    version: 2,
     healthy,
-    status: level,
+    // Specific code + human labels (replaces vague "degraded")
+    status: derived.status,
+    status_label: derived.status_label,
+    status_detail: derived.status_detail,
+    severity: derived.severity,
+    reasons: derived.reasons,
     status_hint: live.last_exit_hint,
     started_at: live.started_at,
     uptime_sec: Math.floor((Date.now() - Date.parse(live.started_at)) / 1000),
@@ -592,6 +731,12 @@ function toPublicStatus() {
     network: config.network || null,
     teleport_contract: config.eos.teleportContract,
     node: process.version,
+    brand: {
+      name: 'Alien Worlds',
+      product: 'TLM Teleport',
+      site: 'https://alienworlds.io/',
+      teleport: 'https://teleport.alienworlds.io/',
+    },
   };
 
   if (!report) {
@@ -599,6 +744,17 @@ function toPublicStatus() {
   }
 
   const MAX_LIST = 50;
+  const enrichTeleport = (x) => ({
+    ...publicTeleportItem(x),
+    chain_name: chainLabel(x.chain_id),
+    age: formatAge(x.age_sec),
+  });
+  const enrichReceipt = (x) => ({
+    ...publicReceiptItem(x),
+    chain_name: chainLabel(x.chain_id),
+    age: formatAge(x.age_sec),
+  });
+
   return {
     ...base,
     chain_id_filter: report.chain_id_filter,
@@ -606,32 +762,38 @@ function toPublicStatus() {
     thresholds: report.thresholds,
     summary: {
       missing_mine: report.missing_for_this_oracle.count,
+      missing_signatures: report.missing_for_this_oracle.antelope_to_evm.length,
+      missing_approvals: report.missing_for_this_oracle.evm_to_antelope.length,
       system_incomplete: report.system_incomplete.count,
+      stuck_after_our_participation:
+        report.system_incomplete.antelope_to_evm.filter((x) => x.this_oracle_signed).length +
+        report.system_incomplete.evm_to_antelope.filter((x) => x.this_oracle_approved).length,
       awaiting_user_claim: report.awaiting_user_claim.count,
     },
     missing_for_this_oracle: {
       count: report.missing_for_this_oracle.count,
       antelope_to_evm: report.missing_for_this_oracle.antelope_to_evm
         .slice(0, MAX_LIST)
-        .map(publicTeleportItem),
+        .map(enrichTeleport),
       evm_to_antelope: report.missing_for_this_oracle.evm_to_antelope
         .slice(0, MAX_LIST)
-        .map(publicReceiptItem),
+        .map(enrichReceipt),
     },
     system_incomplete: {
       count: report.system_incomplete.count,
       antelope_to_evm: report.system_incomplete.antelope_to_evm
         .slice(0, MAX_LIST)
-        .map(publicTeleportItem),
+        .map(enrichTeleport),
       evm_to_antelope: report.system_incomplete.evm_to_antelope
         .slice(0, MAX_LIST)
-        .map(publicReceiptItem),
+        .map(enrichReceipt),
     },
     awaiting_user_claim: {
       count: report.awaiting_user_claim.count,
       sample: (report.awaiting_user_claim.sample || []).map((x) => ({
         id: x.id,
         chain_id: x.chain_id,
+        chain_name: chainLabel(x.chain_id),
         account: x.account,
         quantity: x.quantity,
         signatures: x.signatures,
@@ -648,25 +810,24 @@ function renderHtml(status) {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
 
-  const badge =
-    status.status === 'ok'
-      ? '#0a7'
-      : status.status === 'warning'
-        ? '#c80'
-        : status.status === 'degraded'
-          ? '#c40'
-          : status.status === 'starting'
-            ? '#68a'
-            : '#c33';
+  const severity = status.severity || 'info';
+  const badgeClass =
+    severity === 'ok'
+      ? 'ok'
+      : severity === 'warning'
+        ? 'warn'
+        : severity === 'critical'
+          ? 'crit'
+          : 'info';
 
   const rowList = (items, cols) => {
-    if (!items || !items.length) return '<p class="muted">None</p>';
+    if (!items || !items.length) return '<p class="muted empty">None in scan window</p>';
     const head = cols.map((c) => `<th>${esc(c.label)}</th>`).join('');
     const body = items
       .map((item) => {
         const tds = cols
           .map((c) => {
-            let v = item[c.key];
+            let v = typeof c.get === 'function' ? c.get(item) : item[c.key];
             if (Array.isArray(v)) v = v.join(', ');
             return `<td>${esc(v)}</td>`;
           })
@@ -674,10 +835,22 @@ function renderHtml(status) {
         return `<tr>${tds}</tr>`;
       })
       .join('');
-    return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
   };
 
-  const s = status.summary || { missing_mine: '—', system_incomplete: '—', awaiting_user_claim: '—' };
+  const s = status.summary || {};
+  const reasons = status.reasons || [];
+  const logo =
+    'https://alienworlds-media-bucket.s3.eu-central-1.amazonaws.com/alienworlds_logo_81750a6c20.webp';
+
+  const reasonHtml = reasons.length
+    ? `<ul class="reasons">${reasons
+        .map(
+          (r) =>
+            `<li><span class="reason-code">${esc(r.code)}</span> ${esc(r.message)}</li>`
+        )
+        .join('')}</ul>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -685,97 +858,252 @@ function renderHtml(status) {
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta http-equiv="refresh" content="60"/>
-  <title>Alien Teleport Oracle Status</title>
+  <title>TLM Teleport Oracle · Alien Worlds</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
-    :root { color-scheme: dark light; }
-    body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 1.5rem; line-height: 1.45;
-      background: #0f1419; color: #e7ecf1; }
-    h1 { font-size: 1.35rem; margin: 0 0 .5rem; }
-    h2 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; border-bottom: 1px solid #2a3440; padding-bottom: .3rem; }
-    .badge { display: inline-block; padding: .2rem .6rem; border-radius: 999px; background: ${badge};
-      color: #fff; font-weight: 600; font-size: .85rem; text-transform: uppercase; }
-    .meta { color: #9aa7b5; font-size: .9rem; margin: .4rem 0 1rem; }
-    .cards { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
-    .card { background: #1a222c; border: 1px solid #2a3440; border-radius: 8px; padding: .75rem 1rem; min-width: 8rem; }
-    .card .n { font-size: 1.6rem; font-weight: 700; }
-    .card .l { font-size: .75rem; color: #9aa7b5; text-transform: uppercase; letter-spacing: .04em; }
-    table { width: 100%; border-collapse: collapse; font-size: .85rem; overflow-x: auto; display: block; }
-    th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #2a3440; vertical-align: top; }
-    th { color: #9aa7b5; font-weight: 600; }
-    .muted { color: #9aa7b5; }
-    a { color: #6cb6ff; }
-    code { background: #1a222c; padding: .1rem .3rem; border-radius: 4px; font-size: .85em; }
-    footer { margin-top: 2rem; color: #6a7682; font-size: .8rem; }
+    :root {
+      --bg0: #050816;
+      --bg1: #0b1230;
+      --panel: rgba(12, 22, 48, 0.82);
+      --panel-border: rgba(0, 229, 255, 0.18);
+      --text: #e8f4ff;
+      --muted: #8aa0c0;
+      --cyan: #00e5ff;
+      --gold: #f5c542;
+      --violet: #7c5cff;
+      --ok: #2ee59d;
+      --warn: #f5c542;
+      --crit: #ff5c7a;
+      --info: #5b8cff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      font-family: "Exo 2", system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(124, 92, 255, 0.35), transparent 55%),
+        radial-gradient(900px 500px at 90% 0%, rgba(0, 229, 255, 0.18), transparent 50%),
+        radial-gradient(800px 400px at 50% 100%, rgba(245, 197, 66, 0.08), transparent 45%),
+        linear-gradient(165deg, var(--bg0), var(--bg1) 50%, #07101f);
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+    header.hero {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem;
+      padding: 1.25rem 1.4rem; border-radius: 16px;
+      background: var(--panel); border: 1px solid var(--panel-border);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 0 40px rgba(0, 229, 255, 0.06);
+    }
+    .logo { height: 48px; width: auto; filter: drop-shadow(0 0 12px rgba(0,229,255,.35)); }
+    .titles h1 {
+      font-family: Orbitron, sans-serif; font-size: 1.35rem; margin: 0 0 .25rem;
+      letter-spacing: .04em; color: #fff;
+    }
+    .titles .sub { color: var(--muted); font-size: .92rem; margin: 0; }
+    .titles a { color: var(--cyan); text-decoration: none; }
+    .titles a:hover { text-decoration: underline; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-left: auto; }
+    .badge {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .35rem .85rem; border-radius: 999px;
+      font-family: Orbitron, sans-serif; font-size: .72rem; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase;
+      border: 1px solid transparent;
+    }
+    .badge.ok { background: rgba(46,229,157,.15); color: var(--ok); border-color: rgba(46,229,157,.4); }
+    .badge.warn { background: rgba(245,197,66,.15); color: var(--warn); border-color: rgba(245,197,66,.45); }
+    .badge.crit { background: rgba(255,92,122,.15); color: var(--crit); border-color: rgba(255,92,122,.45); }
+    .badge.info { background: rgba(91,140,255,.15); color: var(--info); border-color: rgba(91,140,255,.4); }
+    .status-panel {
+      margin-top: 1.25rem; padding: 1.1rem 1.25rem; border-radius: 14px;
+      background: var(--panel); border: 1px solid var(--panel-border);
+    }
+    .status-panel h2 {
+      font-family: Orbitron, sans-serif; font-size: .95rem; margin: 0 0 .4rem;
+      color: var(--cyan); letter-spacing: .04em;
+    }
+    .status-panel p { margin: 0; color: var(--text); }
+    .status-panel .detail { color: var(--muted); margin-top: .45rem; font-size: .95rem; }
+    .reasons { margin: .75rem 0 0; padding-left: 1.1rem; color: var(--muted); font-size: .9rem; }
+    .reason-code {
+      display: inline-block; font-family: ui-monospace, monospace; font-size: .75rem;
+      color: var(--gold); background: rgba(245,197,66,.1); padding: .05rem .35rem; border-radius: 4px;
+      margin-right: .25rem;
+    }
+    .meta {
+      display: flex; flex-wrap: wrap; gap: .35rem .85rem; margin: 1rem 0 0;
+      color: var(--muted); font-size: .85rem;
+    }
+    .meta code {
+      font-family: ui-monospace, monospace; font-size: .8em;
+      background: rgba(0,229,255,.08); color: var(--cyan);
+      padding: .1rem .35rem; border-radius: 4px; border: 1px solid rgba(0,229,255,.15);
+    }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; margin: 1.25rem 0; }
+    .card {
+      background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+      padding: .9rem 1rem; position: relative; overflow: hidden;
+    }
+    .card::before {
+      content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+      background: linear-gradient(var(--cyan), var(--violet));
+    }
+    .card.alert::before { background: linear-gradient(var(--crit), var(--gold)); }
+    .card .n { font-family: Orbitron, sans-serif; font-size: 1.55rem; font-weight: 700; color: #fff; }
+    .card.alert .n { color: var(--crit); }
+    .card .l { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-top: .2rem; }
+    section {
+      margin-top: 1.25rem; padding: 1rem 1.15rem 1.15rem; border-radius: 14px;
+      background: var(--panel); border: 1px solid var(--panel-border);
+    }
+    section h3 {
+      font-family: Orbitron, sans-serif; font-size: .82rem; margin: 0 0 .75rem;
+      color: var(--gold); letter-spacing: .06em; text-transform: uppercase;
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+    tr:hover td { background: rgba(0,229,255,.04); }
+    .muted { color: var(--muted); }
+    .empty { font-style: italic; margin: 0; }
+    footer {
+      margin-top: 1.75rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,.08);
+      color: var(--muted); font-size: .78rem; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center;
+    }
+    footer a { color: var(--cyan); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .pulse { width: .55rem; height: .55rem; border-radius: 50%; background: currentColor;
+      box-shadow: 0 0 8px currentColor; animation: pulse 1.6s ease infinite; }
+    @keyframes pulse { 50% { opacity: .45; } }
   </style>
 </head>
 <body>
-  <h1>Alien Teleport Oracle Monitor</h1>
-  <div><span class="badge">${esc(status.status)}</span></div>
-  <p class="meta">
-    oracle <code>${esc(status.oracle_account)}</code>
-    · network <code>${esc(status.network)}</code>
-    · contract <code>${esc(status.teleport_contract)}</code>
-    · chain filter <code>${esc(status.chain_id_filter)}</code>
-    · node <code>${esc(status.node)}</code>
-  </p>
-  <div class="cards">
-    <div class="card"><div class="n">${esc(s.missing_mine)}</div><div class="l">Missing mine</div></div>
-    <div class="card"><div class="n">${esc(s.system_incomplete)}</div><div class="l">System incomplete</div></div>
-    <div class="card"><div class="n">${esc(s.awaiting_user_claim)}</div><div class="l">Awaiting claim</div></div>
-    <div class="card"><div class="n">${esc(status.scan_count)}</div><div class="l">Scans</div></div>
+  <div class="wrap">
+    <header class="hero">
+      <img class="logo" src="${esc(logo)}" alt="Alien Worlds" width="180" height="48"/>
+      <div class="titles">
+        <h1>TLM Teleport Oracle</h1>
+        <p class="sub">
+          Bridge health for
+          <a href="https://teleport.alienworlds.io/" target="_blank" rel="noopener">Teleport</a>
+          ·
+          <a href="https://alienworlds.io/" target="_blank" rel="noopener">alienworlds.io</a>
+        </p>
+      </div>
+      <div class="badge-row">
+        <span class="badge ${badgeClass}"><span class="pulse"></span> ${esc(status.status_label || status.status)}</span>
+      </div>
+    </header>
+
+    <div class="status-panel">
+      <h2>${esc(status.status_label || status.status)}</h2>
+      <p class="detail">${esc(status.status_detail || '')}</p>
+      ${reasonHtml}
+      <div class="meta">
+        <span>oracle <code>${esc(status.oracle_account)}</code></span>
+        <span>contract <code>${esc(status.teleport_contract)}</code></span>
+        <span>network <code>${esc(status.network)}</code></span>
+        <span>chains <code>${esc(status.chain_id_filter)}</code></span>
+        <span>node <code>${esc(status.node)}</code></span>
+        <span>code <code>${esc(status.status)}</code></span>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card ${(s.missing_signatures || 0) > 0 ? 'alert' : ''}">
+        <div class="n">${esc(s.missing_signatures ?? '—')}</div>
+        <div class="l">Missing my signatures</div>
+      </div>
+      <div class="card ${(s.missing_approvals || 0) > 0 ? 'alert' : ''}">
+        <div class="n">${esc(s.missing_approvals ?? '—')}</div>
+        <div class="l">Missing my approvals</div>
+      </div>
+      <div class="card ${(s.stuck_after_our_participation || 0) > 0 ? 'alert' : ''}">
+        <div class="n">${esc(s.stuck_after_our_participation ?? '—')}</div>
+        <div class="l">Stuck (others / legacy)</div>
+      </div>
+      <div class="card">
+        <div class="n">${esc(s.awaiting_user_claim ?? '—')}</div>
+        <div class="l">Awaiting user claim</div>
+      </div>
+      <div class="card">
+        <div class="n">${esc(status.scan_count)}</div>
+        <div class="l">Scans completed</div>
+      </div>
+    </div>
+
+    <p class="meta" style="margin-top:0">
+      last scan <code>${esc(status.last_scan_at || '—')}</code>
+      ${status.last_scan_duration_ms != null ? `(${esc(status.last_scan_duration_ms)} ms)` : ''}
+      · uptime <code>${esc(status.uptime_sec)}s</code>
+      ${status.scanning ? '· <strong style="color:var(--cyan)">scanning now…</strong>' : ''}
+      ${status.last_error ? `· error: ${esc(status.last_error)}` : ''}
+    </p>
+
+    <section>
+      <h3>Missing this oracle · Antelope → EVM signatures</h3>
+      ${rowList((status.missing_for_this_oracle && status.missing_for_this_oracle.antelope_to_evm) || [], [
+        { key: 'id', label: 'ID' },
+        { key: 'chain_name', label: 'Chain' },
+        { key: 'quantity', label: 'Qty' },
+        { key: 'account', label: 'From' },
+        { get: (i) => `${i.signatures}/${i.threshold}`, label: 'Sigs' },
+        { key: 'oracles', label: 'Oracles' },
+        { key: 'age', label: 'Age' },
+      ])}
+    </section>
+
+    <section>
+      <h3>Missing this oracle · EVM → Antelope approvals</h3>
+      ${rowList((status.missing_for_this_oracle && status.missing_for_this_oracle.evm_to_antelope) || [], [
+        { key: 'id', label: 'ID' },
+        { key: 'chain_name', label: 'Chain' },
+        { key: 'quantity', label: 'Qty' },
+        { key: 'to', label: 'To' },
+        { get: (i) => `${i.confirmations}/${i.threshold}`, label: 'Conf' },
+        { key: 'approvers', label: 'Approvers' },
+        { key: 'age', label: 'Age' },
+      ])}
+    </section>
+
+    <section>
+      <h3>System incomplete · teleports (any gap)</h3>
+      ${rowList((status.system_incomplete && status.system_incomplete.antelope_to_evm) || [], [
+        { key: 'id', label: 'Teleport' },
+        { key: 'chain_name', label: 'Chain' },
+        { key: 'quantity', label: 'Qty' },
+        { get: (i) => `${i.signatures}/${i.threshold}`, label: 'Sigs' },
+        { key: 'oracles', label: 'Oracles' },
+        { get: (i) => (i.this_oracle_signed ? 'yes' : 'no'), label: 'We signed' },
+        { key: 'age', label: 'Age' },
+      ])}
+    </section>
+
+    <section>
+      <h3>System incomplete · receipts (any gap)</h3>
+      ${rowList((status.system_incomplete && status.system_incomplete.evm_to_antelope) || [], [
+        { key: 'id', label: 'Receipt' },
+        { key: 'chain_name', label: 'Chain' },
+        { key: 'quantity', label: 'Qty' },
+        { get: (i) => `${i.confirmations}/${i.threshold}`, label: 'Conf' },
+        { key: 'approvers', label: 'Approvers' },
+        { get: (i) => (i.this_oracle_approved ? 'yes' : 'no'), label: 'We approved' },
+        { key: 'age', label: 'Age' },
+      ])}
+    </section>
+
+    <footer>
+      <span>Read-only public status · on-chain data only</span>
+      <a href="/api/status">JSON API</a>
+      <a href="/health">Health</a>
+      <a href="https://teleport.alienworlds.io/" target="_blank" rel="noopener">Teleport app</a>
+      <span>Auto-refresh 60s</span>
+    </footer>
   </div>
-  <p class="meta">
-    last scan ${esc(status.last_scan_at || '—')}
-    ${status.last_scan_duration_ms != null ? `(${esc(status.last_scan_duration_ms)} ms)` : ''}
-    · uptime ${esc(status.uptime_sec)}s
-    ${status.scanning ? '· <strong>scanning now…</strong>' : ''}
-    ${status.last_error ? `· error: ${esc(status.last_error)}` : ''}
-  </p>
-
-  <h2>Missing this oracle (Antelope → EVM)</h2>
-  ${rowList((status.missing_for_this_oracle && status.missing_for_this_oracle.antelope_to_evm) || [], [
-    { key: 'id', label: 'ID' },
-    { key: 'chain_id', label: 'Chain' },
-    { key: 'quantity', label: 'Qty' },
-    { key: 'account', label: 'From' },
-    { key: 'signatures', label: 'Sigs' },
-    { key: 'oracles', label: 'Oracles' },
-    { key: 'age_sec', label: 'Age (s)' },
-  ])}
-
-  <h2>Missing this oracle (EVM → Antelope)</h2>
-  ${rowList((status.missing_for_this_oracle && status.missing_for_this_oracle.evm_to_antelope) || [], [
-    { key: 'id', label: 'ID' },
-    { key: 'chain_id', label: 'Chain' },
-    { key: 'quantity', label: 'Qty' },
-    { key: 'to', label: 'To' },
-    { key: 'confirmations', label: 'Conf' },
-    { key: 'approvers', label: 'Approvers' },
-    { key: 'age_sec', label: 'Age (s)' },
-  ])}
-
-  <h2>System incomplete (any oracle gap)</h2>
-  ${rowList((status.system_incomplete && status.system_incomplete.antelope_to_evm) || [], [
-    { key: 'id', label: 'Teleport' },
-    { key: 'chain_id', label: 'Chain' },
-    { key: 'quantity', label: 'Qty' },
-    { key: 'signatures', label: 'Sigs' },
-    { key: 'oracles', label: 'Oracles' },
-  ])}
-  ${rowList((status.system_incomplete && status.system_incomplete.evm_to_antelope) || [], [
-    { key: 'id', label: 'Receipt' },
-    { key: 'chain_id', label: 'Chain' },
-    { key: 'quantity', label: 'Qty' },
-    { key: 'confirmations', label: 'Conf' },
-    { key: 'approvers', label: 'Approvers' },
-  ])}
-
-  <footer>
-    Read-only public status · no private keys or RPC credentials ·
-    <a href="/api/status">/api/status</a> ·
-    <a href="/health">/health</a> ·
-    auto-refresh 60s
-  </footer>
 </body>
 </html>`;
 }
@@ -816,11 +1144,16 @@ function startStatusServer(opts) {
         const body = JSON.stringify({
           ok: st.healthy,
           status: st.status,
+          status_label: st.status_label,
+          status_detail: st.status_detail,
+          severity: st.severity,
+          reasons: (st.reasons || []).map((r) => r.code),
           status_hint: st.status_hint,
           last_scan_at: st.last_scan_at,
           scanning: st.scanning,
+          summary: st.summary || null,
         });
-        // 200 even when degraded so LB doesn't flap; clients inspect ok/status
+        // 200 even when not ok so LB doesn't flap; clients inspect ok/status
         send(200, 'application/json; charset=utf-8', body);
         return;
       }

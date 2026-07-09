@@ -27,16 +27,37 @@
  *   PAGES               max pages of 100 rows per table (default 100 ≈ 10k rows)
  *   CHAIN_ID            filter chain_id, or "all" for every chain (default: all)
  *   HYPERION            optional Hyperion base URL for block_num hints
+ *   STATUS_PORT         HTTP status API port (default 9090; 0 disables)
+ *   STATUS_BIND         bind address (default 0.0.0.0)
+ *
+ * HTTP (watch mode, when STATUS_PORT > 0):
+ *   GET /           HTML status dashboard (safe public fields only)
+ *   GET /health     minimal health JSON (for load balancers)
+ *   GET /api/status full public status JSON
+ *   GET /api/health alias of /health
  */
 
 const config_file = process.env.CONFIG || './config';
 process.title = `monitor-teleports ${config_file}`;
 
+const http = require('http');
 const { JsonRpc } = require('eosjs');
 const fetch = require('node-fetch');
 
 const config = require(config_file);
 const rpc = new JsonRpc(config.eos.endpoint, { fetch });
+
+/** In-memory live status for the HTTP API (never holds secrets). */
+const live = {
+  started_at: new Date().toISOString(),
+  last_scan_at: null,
+  last_scan_duration_ms: null,
+  last_exit_hint: null,
+  last_error: null,
+  scan_count: 0,
+  report: null,
+  scanning: false,
+};
 
 /**
  * Parse a finite integer. Rejects empty/non-numeric so NaN cannot silently
@@ -80,6 +101,8 @@ function parseArgs(argv) {
     pages: 100,
     chainId: null, // default: all chains
     hyperion: process.env.HYPERION || '',
+    statusPort: 9090,
+    statusBind: process.env.STATUS_BIND || '0.0.0.0',
   };
 
   try {
@@ -99,6 +122,9 @@ function parseArgs(argv) {
 
     const envPages = parseOptionalFiniteInt(process.env.PAGES, 'PAGES', { min: 1 });
     if (envPages !== undefined) args.pages = envPages;
+
+    const envPort = parseOptionalFiniteInt(process.env.STATUS_PORT, 'STATUS_PORT', { min: 0, max: 65535 });
+    if (envPort !== undefined) args.statusPort = envPort;
 
     const chainEnv = process.env.CHAIN_ID;
     if (chainEnv !== undefined && chainEnv !== '' && chainEnv !== 'all') {
@@ -124,6 +150,10 @@ function parseArgs(argv) {
         args.minAgeSec = parseFiniteInt(argv[++i], '--min-age', { min: 0 });
       } else if (a === '--pages' && argv[i + 1]) {
         args.pages = parseFiniteInt(argv[++i], '--pages', { min: 1 });
+      } else if (a === '--port' && argv[i + 1]) {
+        args.statusPort = parseFiniteInt(argv[++i], '--port', { min: 0, max: 65535 });
+      } else if (a === '--bind' && argv[i + 1]) {
+        args.statusBind = argv[++i];
       } else if (a === '--chain-id' && argv[i + 1]) {
         const v = argv[++i];
         if (v === 'all') {
@@ -149,6 +179,8 @@ Options:
   --receipt-threshold <n> EVM→Antelope confirmations (default 5)
   --min-age <sec>         Ignore items newer than this (default 120)
   --pages <n>             Max pages of 100 rows per table (default 100)
+  --port <n>              HTTP status port (default 9090; 0 disables)
+  --bind <addr>           HTTP bind address (default 0.0.0.0)
   --hyperion <url>        Hyperion base for block_num hints
 `);
         process.exit(0);
@@ -487,6 +519,342 @@ function exitCode(report) {
   return 0;
 }
 
+/** Public teleport row — on-chain fields only, no secrets. */
+function publicTeleportItem(x) {
+  return {
+    id: x.id,
+    chain_id: x.chain_id,
+    account: x.account,
+    quantity: x.quantity,
+    signatures: x.signatures,
+    threshold: x.threshold,
+    oracles: x.oracles,
+    age_sec: x.age_sec,
+    this_oracle_signed: x.this_oracle_signed,
+    block_num: x.block_num != null ? x.block_num : undefined,
+  };
+}
+
+function publicReceiptItem(x) {
+  return {
+    id: x.id,
+    chain_id: x.chain_id,
+    to: x.to,
+    // full tx ref is on-chain public data
+    ref: x.ref,
+    quantity: x.quantity,
+    confirmations: x.confirmations,
+    threshold: x.threshold,
+    approvers: x.approvers,
+    age_sec: x.age_sec,
+    this_oracle_approved: x.this_oracle_approved,
+  };
+}
+
+/**
+ * Strip anything that could leak ops secrets (RPC URLs, keys, file paths).
+ * Output is safe to expose on a public status page.
+ */
+function toPublicStatus() {
+  const report = live.report;
+  const healthy =
+    live.last_error == null &&
+    report != null &&
+    report.missing_for_this_oracle.count === 0 &&
+    report.system_incomplete.count === 0;
+
+  const level =
+    live.last_error != null
+      ? 'error'
+      : report == null
+        ? 'starting'
+        : report.missing_for_this_oracle.count > 0
+          ? 'degraded'
+          : report.system_incomplete.count > 0
+            ? 'warning'
+            : 'ok';
+
+  const base = {
+    service: 'alienteleport-oracle-monitor',
+    version: 1,
+    healthy,
+    status: level,
+    status_hint: live.last_exit_hint,
+    started_at: live.started_at,
+    uptime_sec: Math.floor((Date.now() - Date.parse(live.started_at)) / 1000),
+    last_scan_at: live.last_scan_at,
+    last_scan_duration_ms: live.last_scan_duration_ms,
+    scan_count: live.scan_count,
+    scanning: live.scanning,
+    last_error: live.last_error,
+    // public identity only — never private keys or RPC URLs
+    oracle_account: config.eos.oracleAccount,
+    network: config.network || null,
+    teleport_contract: config.eos.teleportContract,
+    node: process.version,
+  };
+
+  if (!report) {
+    return base;
+  }
+
+  const MAX_LIST = 50;
+  return {
+    ...base,
+    chain_id_filter: report.chain_id_filter,
+    scanned: report.scanned,
+    thresholds: report.thresholds,
+    summary: {
+      missing_mine: report.missing_for_this_oracle.count,
+      system_incomplete: report.system_incomplete.count,
+      awaiting_user_claim: report.awaiting_user_claim.count,
+    },
+    missing_for_this_oracle: {
+      count: report.missing_for_this_oracle.count,
+      antelope_to_evm: report.missing_for_this_oracle.antelope_to_evm
+        .slice(0, MAX_LIST)
+        .map(publicTeleportItem),
+      evm_to_antelope: report.missing_for_this_oracle.evm_to_antelope
+        .slice(0, MAX_LIST)
+        .map(publicReceiptItem),
+    },
+    system_incomplete: {
+      count: report.system_incomplete.count,
+      antelope_to_evm: report.system_incomplete.antelope_to_evm
+        .slice(0, MAX_LIST)
+        .map(publicTeleportItem),
+      evm_to_antelope: report.system_incomplete.evm_to_antelope
+        .slice(0, MAX_LIST)
+        .map(publicReceiptItem),
+    },
+    awaiting_user_claim: {
+      count: report.awaiting_user_claim.count,
+      sample: (report.awaiting_user_claim.sample || []).map((x) => ({
+        id: x.id,
+        chain_id: x.chain_id,
+        account: x.account,
+        quantity: x.quantity,
+        signatures: x.signatures,
+      })),
+    },
+  };
+}
+
+function renderHtml(status) {
+  const esc = (s) =>
+    String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  const badge =
+    status.status === 'ok'
+      ? '#0a7'
+      : status.status === 'warning'
+        ? '#c80'
+        : status.status === 'degraded'
+          ? '#c40'
+          : status.status === 'starting'
+            ? '#68a'
+            : '#c33';
+
+  const rowList = (items, cols) => {
+    if (!items || !items.length) return '<p class="muted">None</p>';
+    const head = cols.map((c) => `<th>${esc(c.label)}</th>`).join('');
+    const body = items
+      .map((item) => {
+        const tds = cols
+          .map((c) => {
+            let v = item[c.key];
+            if (Array.isArray(v)) v = v.join(', ');
+            return `<td>${esc(v)}</td>`;
+          })
+          .join('');
+        return `<tr>${tds}</tr>`;
+      })
+      .join('');
+    return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  };
+
+  const s = status.summary || { missing_mine: '—', system_incomplete: '—', awaiting_user_claim: '—' };
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta http-equiv="refresh" content="60"/>
+  <title>Alien Teleport Oracle Status</title>
+  <style>
+    :root { color-scheme: dark light; }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 1.5rem; line-height: 1.45;
+      background: #0f1419; color: #e7ecf1; }
+    h1 { font-size: 1.35rem; margin: 0 0 .5rem; }
+    h2 { font-size: 1.05rem; margin: 1.5rem 0 .5rem; border-bottom: 1px solid #2a3440; padding-bottom: .3rem; }
+    .badge { display: inline-block; padding: .2rem .6rem; border-radius: 999px; background: ${badge};
+      color: #fff; font-weight: 600; font-size: .85rem; text-transform: uppercase; }
+    .meta { color: #9aa7b5; font-size: .9rem; margin: .4rem 0 1rem; }
+    .cards { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+    .card { background: #1a222c; border: 1px solid #2a3440; border-radius: 8px; padding: .75rem 1rem; min-width: 8rem; }
+    .card .n { font-size: 1.6rem; font-weight: 700; }
+    .card .l { font-size: .75rem; color: #9aa7b5; text-transform: uppercase; letter-spacing: .04em; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; overflow-x: auto; display: block; }
+    th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #2a3440; vertical-align: top; }
+    th { color: #9aa7b5; font-weight: 600; }
+    .muted { color: #9aa7b5; }
+    a { color: #6cb6ff; }
+    code { background: #1a222c; padding: .1rem .3rem; border-radius: 4px; font-size: .85em; }
+    footer { margin-top: 2rem; color: #6a7682; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <h1>Alien Teleport Oracle Monitor</h1>
+  <div><span class="badge">${esc(status.status)}</span></div>
+  <p class="meta">
+    oracle <code>${esc(status.oracle_account)}</code>
+    · network <code>${esc(status.network)}</code>
+    · contract <code>${esc(status.teleport_contract)}</code>
+    · chain filter <code>${esc(status.chain_id_filter)}</code>
+    · node <code>${esc(status.node)}</code>
+  </p>
+  <div class="cards">
+    <div class="card"><div class="n">${esc(s.missing_mine)}</div><div class="l">Missing mine</div></div>
+    <div class="card"><div class="n">${esc(s.system_incomplete)}</div><div class="l">System incomplete</div></div>
+    <div class="card"><div class="n">${esc(s.awaiting_user_claim)}</div><div class="l">Awaiting claim</div></div>
+    <div class="card"><div class="n">${esc(status.scan_count)}</div><div class="l">Scans</div></div>
+  </div>
+  <p class="meta">
+    last scan ${esc(status.last_scan_at || '—')}
+    ${status.last_scan_duration_ms != null ? `(${esc(status.last_scan_duration_ms)} ms)` : ''}
+    · uptime ${esc(status.uptime_sec)}s
+    ${status.scanning ? '· <strong>scanning now…</strong>' : ''}
+    ${status.last_error ? `· error: ${esc(status.last_error)}` : ''}
+  </p>
+
+  <h2>Missing this oracle (Antelope → EVM)</h2>
+  ${rowList((status.missing_for_this_oracle && status.missing_for_this_oracle.antelope_to_evm) || [], [
+    { key: 'id', label: 'ID' },
+    { key: 'chain_id', label: 'Chain' },
+    { key: 'quantity', label: 'Qty' },
+    { key: 'account', label: 'From' },
+    { key: 'signatures', label: 'Sigs' },
+    { key: 'oracles', label: 'Oracles' },
+    { key: 'age_sec', label: 'Age (s)' },
+  ])}
+
+  <h2>Missing this oracle (EVM → Antelope)</h2>
+  ${rowList((status.missing_for_this_oracle && status.missing_for_this_oracle.evm_to_antelope) || [], [
+    { key: 'id', label: 'ID' },
+    { key: 'chain_id', label: 'Chain' },
+    { key: 'quantity', label: 'Qty' },
+    { key: 'to', label: 'To' },
+    { key: 'confirmations', label: 'Conf' },
+    { key: 'approvers', label: 'Approvers' },
+    { key: 'age_sec', label: 'Age (s)' },
+  ])}
+
+  <h2>System incomplete (any oracle gap)</h2>
+  ${rowList((status.system_incomplete && status.system_incomplete.antelope_to_evm) || [], [
+    { key: 'id', label: 'Teleport' },
+    { key: 'chain_id', label: 'Chain' },
+    { key: 'quantity', label: 'Qty' },
+    { key: 'signatures', label: 'Sigs' },
+    { key: 'oracles', label: 'Oracles' },
+  ])}
+  ${rowList((status.system_incomplete && status.system_incomplete.evm_to_antelope) || [], [
+    { key: 'id', label: 'Receipt' },
+    { key: 'chain_id', label: 'Chain' },
+    { key: 'quantity', label: 'Qty' },
+    { key: 'confirmations', label: 'Conf' },
+    { key: 'approvers', label: 'Approvers' },
+  ])}
+
+  <footer>
+    Read-only public status · no private keys or RPC credentials ·
+    <a href="/api/status">/api/status</a> ·
+    <a href="/health">/health</a> ·
+    auto-refresh 60s
+  </footer>
+</body>
+</html>`;
+}
+
+function startStatusServer(opts) {
+  if (!opts.statusPort) {
+    console.log('HTTP status API disabled (STATUS_PORT=0)');
+    return null;
+  }
+
+  const server = http.createServer((req, res) => {
+    // Read-only: reject non-GET
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { 'Content-Type': 'text/plain', Allow: 'GET, HEAD' });
+      res.end('Method Not Allowed');
+      return;
+    }
+
+    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+    const path = url.pathname.replace(/\/+$/, '') || '/';
+
+    const send = (code, type, body) => {
+      res.writeHead(code, {
+        'Content-Type': type,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      if (req.method === 'HEAD') {
+        res.end();
+        return;
+      }
+      res.end(body);
+    };
+
+    try {
+      if (path === '/health' || path === '/api/health') {
+        const st = toPublicStatus();
+        const body = JSON.stringify({
+          ok: st.healthy,
+          status: st.status,
+          status_hint: st.status_hint,
+          last_scan_at: st.last_scan_at,
+          scanning: st.scanning,
+        });
+        // 200 even when degraded so LB doesn't flap; clients inspect ok/status
+        send(200, 'application/json; charset=utf-8', body);
+        return;
+      }
+
+      if (path === '/api/status' || path === '/api/v1/status') {
+        send(200, 'application/json; charset=utf-8', JSON.stringify(toPublicStatus(), null, 2));
+        return;
+      }
+
+      if (path === '/' || path === '/status') {
+        send(200, 'text/html; charset=utf-8', renderHtml(toPublicStatus()));
+        return;
+      }
+
+      send(404, 'application/json; charset=utf-8', JSON.stringify({ error: 'not_found' }));
+    } catch (e) {
+      send(500, 'application/json; charset=utf-8', JSON.stringify({ error: 'internal' }));
+    }
+  });
+
+  server.listen(opts.statusPort, opts.statusBind, () => {
+    console.log(`HTTP status API listening on http://${opts.statusBind}:${opts.statusPort}/`);
+    console.log(`  HTML  GET /`);
+    console.log(`  JSON  GET /api/status`);
+    console.log(`  health GET /health`);
+  });
+
+  server.on('error', (e) => {
+    console.error(`HTTP status server error: ${e.message}`);
+  });
+
+  return server;
+}
+
 async function main() {
   const opts = parseArgs(process.argv);
 
@@ -506,15 +874,30 @@ async function main() {
   );
 
   const runOnce = async () => {
+    live.scanning = true;
+    const t0 = Date.now();
     try {
       const report = await scan(opts);
+      live.report = report;
+      live.last_scan_at = new Date().toISOString();
+      live.last_scan_duration_ms = Date.now() - t0;
+      live.last_error = null;
+      live.scan_count += 1;
+      live.last_exit_hint = exitCode(report);
+      live.scanning = false;
+
       if (opts.json) {
         console.log(JSON.stringify(report));
       } else {
         printHuman(report);
       }
-      return exitCode(report);
+      return live.last_exit_hint;
     } catch (e) {
+      live.scanning = false;
+      live.last_error = String(e.message || e);
+      live.last_scan_at = new Date().toISOString();
+      live.last_scan_duration_ms = Date.now() - t0;
+      live.last_exit_hint = 3;
       console.error(`monitor error: ${e.message || e}`);
       if (opts.json) {
         console.log(JSON.stringify({ error: String(e.message || e), ts: new Date().toISOString() }));
@@ -527,6 +910,9 @@ async function main() {
     const code = await runOnce();
     process.exit(code);
   }
+
+  // Watch mode: serve live status + periodic scans
+  startStatusServer(opts);
 
   // eslint-disable-next-line no-constant-condition
   while (true) {

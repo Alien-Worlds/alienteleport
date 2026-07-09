@@ -18,11 +18,13 @@ const live = {
   started_at: new Date().toISOString(),
   last_scan_at: null,
   last_scan_duration_ms: null,
+  last_readers_at: null,
   last_exit_hint: null,
   last_error: null,
   scan_count: 0,
   report: null,
   scanning: false,
+  refreshing_readers: false,
 };
 
 module.exports = {

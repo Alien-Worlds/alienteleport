@@ -146,7 +146,7 @@ function renderHtml(status) {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta http-equiv="refresh" content="60"/>
+  <meta http-equiv="Cache-Control" content="no-store"/>
   <title>TLM Teleport Oracle · Alien Worlds</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -406,10 +406,12 @@ function renderHtml(status) {
           : '<p class="muted empty">Reader snapshot unavailable</p>'
       }
       <p class="meta" style="margin-top:.75rem">
-        last scan <code>${esc(status.last_scan_at || '—')}</code>
+        table scan <code id="last-scan">${esc(status.last_scan_at || '—')}</code>
         ${status.last_scan_duration_ms != null ? `(${esc(status.last_scan_duration_ms)} ms)` : ''}
+        · readers refreshed <code id="last-readers">${esc(status.last_readers_at || status.last_scan_at || '—')}</code>
         · uptime <code>${esc(status.uptime_sec)}s</code>
-        ${status.scanning ? '· <strong style="color:var(--cyan)">scanning now…</strong>' : ''}
+        · next page refresh <code id="refresh-countdown">15s</code>
+        ${status.scanning ? '· <strong style="color:var(--cyan)">scanning tables…</strong>' : ''}
       </p>
     </section>
 
@@ -529,10 +531,28 @@ function renderHtml(status) {
       <a href="/api/status">JSON API</a>
       <a href="/health">Health</a>
       <a href="https://teleport.alienworlds.io/" target="_blank" rel="noopener">Teleport app</a>
-      <span>Auto-refresh 60s</span>
+      <span>Page auto-refresh 15s · readers update on each load</span>
       <span class="tagline">Made with ♥ by Rio Blocks</span>
     </footer>
   </div>
+  <script>
+    (function () {
+      // Full page reload with cache-bust so lag numbers keep moving.
+      // Table completeness still only re-scans on INTERVAL_SEC (server-side).
+      var PERIOD = 15000;
+      var left = PERIOD / 1000;
+      var el = document.getElementById('refresh-countdown');
+      setInterval(function () {
+        left -= 1;
+        if (el) el.textContent = Math.max(0, left) + 's';
+        if (left <= 0) {
+          var u = new URL(window.location.href);
+          u.searchParams.set('_', String(Date.now()));
+          window.location.replace(u.toString());
+        }
+      }, 1000);
+    })();
+  </script>
 </body>
 </html>`;
 }

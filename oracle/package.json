@@ -11,7 +11,7 @@
   "dependencies": {
     "@eosdacio/eosio-statereceiver": "^1.0.2",
     "abi-decoder": "^2.4.0",
-    "eosjs": "^22.0.0",
+    "eosjs": "22.1.0",
     "eosio-helpers": "^0.1.4",
     "ethereumjs-util": "^7.0.4",
     "ethers": "^5.3.1",
@@ -21,5 +21,11 @@
   },
   "devDependencies": {
     "@types/text-encoding": "0.0.36"
+  },
+  "resolutions": {
+    "eosjs": "22.1.0"
+  },
+  "overrides": {
+    "eosjs": "22.1.0"
   }
 }

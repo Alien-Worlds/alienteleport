@@ -20,6 +20,29 @@ const { fork } = require('child_process');
 const Web3 = require('web3');
 const ethUtil = require('ethereumjs-util');
 
+// @eosdacio/eosio-statereceiver hardcodes fetch_block:true, which deserializes every
+// signed_block (including WA/WebAuthn tx signatures). This oracle only uses traces for
+// logteleport — never the block body or block_timestamp — so only fetch blocks when a
+// block handler is actually registered. Also matches how traces/deltas are gated.
+StateReceiver.prototype.requestBlocks = async function () {
+    try {
+        this.current_block = 0;
+
+        await this.connection.requestBlocks({
+            irreversible_only: this.irreversible_only,
+            start_block_num: parseInt(this.start_block),
+            end_block_num: parseInt(this.end_block),
+            have_positions: [],
+            fetch_block: this.block_handlers.length > 0,
+            fetch_traces: this.trace_handlers.length > 0,
+            fetch_deltas: this.delta_handlers.length > 0,
+        });
+    } catch (e) {
+        console.error(e);
+        process.exit(1);
+    }
+};
+
 const config = require(config_file);
 
 const web3 = new Web3(new Web3.providers.HttpProvider(config.eth.endpoint));

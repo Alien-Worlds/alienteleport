@@ -133,22 +133,33 @@ async function collectReaders() {
     }
   }
 
+  // Prefer durable cursor files written by oracle-eos.js; fall back to coarse logs.
+  const waxOracleAccount = config.eos.oracleAccount || 'unknown';
   const waxReaders = [
     { name: 'AW-WAX-ETH-ORACLE', role: 'wax_reader', pair: 'ETH' },
     { name: 'AW-WAX-BSC-ORACLE', role: 'wax_reader', pair: 'BSC' },
   ].map((spec) => {
+    const cursorFile = path.join(
+      dir,
+      `.oracle_WAX_${spec.pair}_block-${waxOracleAccount}`
+    );
+    const fromFile = readBlockFile(cursorFile);
     const logOut = path.join(PM2_LOG_DIR, `${spec.name}-out.log`);
     const mCurrent = lastRegexMatch(logOut, /Current:\s*(\d+)/);
     const mRecv = lastRegexMatch(logOut, /received block\s+(\d+)/);
-    const current =
+    const fromLog =
       (mCurrent && Number(mCurrent[1])) || (mRecv && Number(mRecv[1])) || null;
+    // File is authoritative when present; log is fallback only
+    const current = fromFile != null ? fromFile : fromLog;
+    const source = fromFile != null ? 'cursor_file' : fromLog != null ? 'log' : 'none';
     const pm = pm2ByName[spec.name] || null;
     const lag = waxHead != null && current != null ? Math.max(0, waxHead - current) : null;
     let health = 'unknown';
     if (pm && pm.status === 'online') {
       if (lag == null) health = 'online';
       else if (lag <= 50) health = 'synced';
-      else if (lag <= 2000) health = 'catching_up';
+      else if (lag <= 500) health = 'catching_up';
+      else if (lag <= 5000) health = 'catching_up';
       else health = 'lagging';
     } else if (pm && pm.status) health = pm.status;
     else health = 'not_found';
@@ -160,6 +171,7 @@ async function collectReaders() {
       pair_network: spec.pair,
       process: pm,
       cursor_block: current,
+      cursor_source: source,
       chain_head: waxHead,
       lag_blocks: lag,
       health,

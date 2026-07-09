@@ -10,6 +10,7 @@ it up and then send it to the ethereum chain in a claim action
 const config_file = process.env['CONFIG'] || './config';
 process.title = `oracle-eos ${config_file}`;
 
+const fs = require('fs');
 const StateReceiver = require('@eosdacio/eosio-statereceiver');
 const { Api, JsonRpc, Serialize } = require('eosjs');
 const { JsSignatureProvider } = require('eosjs/dist/eosjs-jssig');
@@ -51,6 +52,33 @@ const rpc = new JsonRpc(config.eos.endpoint, { fetch });
 const eos_api = new Api({ rpc, signatureProvider, textDecoder: new TextDecoder(), textEncoder: new TextEncoder() });
 
 let tx_dispatcher = null;
+
+// Durable WAX cursor (same idea as oracle-eth's .oracle_*_block files).
+// Lets the status monitor report true lag instead of 1000-block log granularity.
+const waxNetwork = config.network || 'ETH';
+const blocks_file = `.oracle_WAX_${waxNetwork}_block-${config.eos.oracleAccount}`;
+
+const load_wax_block = () => {
+    try {
+        if (!fs.existsSync(blocks_file)) return null;
+        const n = parseInt(fs.readFileSync(blocks_file, 'utf8').trim(), 10);
+        return Number.isFinite(n) && !isNaN(n) ? n : null;
+    } catch (_) {
+        return null;
+    }
+};
+
+let _lastSavedWaxBlock = 0;
+const save_wax_block = (block_num) => {
+    // Persist every block for accurate lag; skip no-ops
+    if (!block_num || block_num === _lastSavedWaxBlock) return;
+    _lastSavedWaxBlock = block_num;
+    try {
+        fs.writeFileSync(blocks_file, String(block_num));
+    } catch (e) {
+        console.error(`Failed to save WAX cursor ${block_num}: ${e.message}`);
+    }
+};
 
 // const ethAbi = require(`./eth_abi`);
 
@@ -183,7 +211,7 @@ class TraceHandler {
 const start = async (config, start_block) => {
     const trace_handler = new TraceHandler({ config });
 
-    sr = new StateReceiver({
+    const sr = new StateReceiver({
         startBlock: start_block,
         endBlock: 0xffffffff,
         mode: 0,
@@ -191,12 +219,22 @@ const start = async (config, start_block) => {
         irreversibleOnly: true
     });
 
+    // Persist cursor on every block (before start() binds receivedBlock)
+    const _receivedBlock = sr.receivedBlock.bind(sr);
+    sr.receivedBlock = async function (response, block, traces, deltas) {
+        if (response && response.this_block && response.this_block.block_num) {
+            save_wax_block(response.this_block.block_num);
+        }
+        return _receivedBlock(response, block, traces, deltas);
+    };
+
     sr.registerTraceHandler(trace_handler);
     sr.start();
 }
 
 const run = async (config) => {
     console.log(`Starting EOS watcher for ETH oracle ${config.eth.oracleAccount}`);
+    console.log(`WAX cursor file: ${blocks_file}`);
 
     let start_block;
     if (typeof process.argv[2] !== 'undefined') {
@@ -205,10 +243,18 @@ const run = async (config) => {
             console.error(`Start block must be a number`);
             process.exit(1);
         }
-    }
-    else {
-        const info = await rpc.get_info();
-        start_block = info.head_block_num;
+        console.log(`Starting from CLI block ${start_block}`);
+    } else {
+        const saved = load_wax_block();
+        if (saved != null) {
+            // small rewind for reorg/overlap safety (mirrors oracle-eth -50)
+            start_block = Math.max(1, saved - 50);
+            console.log(`Starting from saved WAX block ${saved} (rewind to ${start_block})`);
+        } else {
+            const info = await rpc.get_info();
+            start_block = info.head_block_num;
+            console.log(`No cursor file; starting from head ${start_block}`);
+        }
     }
 
     console.log(`Starting tx dispatcher`);

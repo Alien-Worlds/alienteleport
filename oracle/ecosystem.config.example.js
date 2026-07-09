@@ -20,5 +20,18 @@ module.exports = {
                 'CONFIG': './config'
             },
         },
+        {
+            // Scans teleports + receipts for missing oracle participation / stuck items
+            name: "alienteleport-monitor",
+            script: "./monitor-teleports.js",
+            autorestart: true,
+            env: {
+                'CONFIG': './config',
+                'INTERVAL_SEC': '300',
+                'PAGES': '100',
+                'MIN_AGE_SEC': '120',
+                'CHAIN_ID': 'all',
+            },
+        },
     ]
 };

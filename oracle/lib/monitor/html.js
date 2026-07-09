@@ -327,6 +327,7 @@ function renderHtml(status) {
     }
     footer a { color: var(--cyan); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
+    footer .tagline { margin-left: auto; color: #a8b8cc; letter-spacing: .02em; }
     .pulse { width: .55rem; height: .55rem; border-radius: 50%; background: currentColor;
       box-shadow: 0 0 8px currentColor; animation: pulse 1.6s ease infinite; }
     @keyframes pulse { 50% { opacity: .45; } }
@@ -529,6 +530,7 @@ function renderHtml(status) {
       <a href="/health">Health</a>
       <a href="https://teleport.alienworlds.io/" target="_blank" rel="noopener">Teleport app</a>
       <span>Auto-refresh 60s</span>
+      <span class="tagline">Made with ♥ by Rio Blocks</span>
     </footer>
   </div>
 </body>

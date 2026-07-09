@@ -21,7 +21,8 @@ module.exports = {
             },
         },
         {
-            // Scans teleports + receipts for missing oracle participation / stuck items
+            // Scans teleports + receipts for missing oracle participation / stuck items.
+            // Read-only status: http://<host>:9090/  and  /api/status  /health
             name: "alienteleport-monitor",
             script: "./monitor-teleports.js",
             autorestart: true,
@@ -31,6 +32,8 @@ module.exports = {
                 'PAGES': '100',
                 'MIN_AGE_SEC': '120',
                 'CHAIN_ID': 'all',
+                'STATUS_PORT': '9090',
+                'STATUS_BIND': '0.0.0.0',
             },
         },
     ]

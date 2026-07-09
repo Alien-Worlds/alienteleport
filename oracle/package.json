@@ -4,23 +4,28 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "monitor": "node monitor-teleports.js",
+    "monitor:once": "node monitor-teleports.js --once"
   },
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=16"
+  },
   "dependencies": {
-    "@eosdacio/eosio-statereceiver": "^1.0.2",
+    "@eosdacio/eosio-statereceiver": "^1.1.1",
     "abi-decoder": "^2.4.0",
     "eosjs": "22.1.0",
-    "eosio-helpers": "^0.1.4",
-    "ethereumjs-util": "^7.0.4",
-    "ethers": "^5.3.1",
-    "node-fetch": "2.0",
+    "eosio-helpers": "^0.1.16",
+    "ethereumjs-util": "^7.1.5",
+    "ethers": "^5.8.0",
+    "node-fetch": "^2.7.0",
     "text-encoding": "^0.7.0",
-    "web3": "^1.2.11"
+    "web3": "^1.10.4"
   },
   "devDependencies": {
-    "@types/text-encoding": "0.0.36"
+    "@types/text-encoding": "^0.0.40"
   },
   "resolutions": {
     "eosjs": "22.1.0"

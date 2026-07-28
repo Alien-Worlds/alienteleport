@@ -21,6 +21,12 @@ const { fork } = require('child_process');
 const Web3 = require('web3');
 const ethUtil = require('ethereumjs-util');
 
+const {
+    configFromEnv: shipConfigFromEnv,
+    ShipRecoveryController,
+    installWsHeartbeat,
+} = require('./lib/ship-recovery');
+
 // @eosdacio/eosio-statereceiver hardcodes fetch_block:true, which deserializes every
 // signed_block (including WA/WebAuthn tx signatures). This oracle only uses traces for
 // logteleport — never the block body or block_timestamp — so only fetch blocks when a
@@ -78,6 +84,18 @@ const save_wax_block = (block_num) => {
     } catch (e) {
         console.error(`Failed to save WAX cursor ${block_num}: ${e.message}`);
     }
+};
+
+const resolve_start_block = (explicit) => {
+    if (typeof explicit === 'number' && Number.isFinite(explicit)) {
+        return Math.max(1, explicit);
+    }
+    const saved = load_wax_block();
+    if (saved != null) {
+        // small rewind for reorg/overlap safety (mirrors oracle-eth -50)
+        return Math.max(1, saved - 50);
+    }
+    return null;
 };
 
 // const ethAbi = require(`./eth_abi`);
@@ -207,29 +225,157 @@ class TraceHandler {
     }
 }
 
+/**
+ * Owns the StateReceiver lifecycle so SHiP stalls can recover without killing
+ * the process (and without dropping the TraceHandler signature queue).
+ */
+class ShipSession {
+    constructor({ config, trace_handler, shipCfg }) {
+        this.config = config;
+        this.trace_handler = trace_handler;
+        this.shipCfg = shipCfg;
+        this.sr = null;
+        this.recovery = null;
+    }
+
+    _wsState() {
+        try {
+            const conn = this.sr && this.sr.connection;
+            if (conn && conn.ws) return String(conn.ws.readyState);
+            if (conn) return `connected=${!!conn.connected} connecting=${!!conn.connecting}`;
+        } catch (_) {
+            /* ignore */
+        }
+        return 'n/a';
+    }
+
+    _disposeReceiver() {
+        const sr = this.sr;
+        this.sr = null;
+        if (!sr || !sr.connection) return;
+        const conn = sr.connection;
+        try {
+            // Prevent the library from reconnecting the socket we are replacing.
+            // disconnect() uses the default close code 1000 (no auto-reconnect).
+            conn.maxConnectionRetries = -1;
+            if (conn.ws) {
+                conn.disconnect();
+            }
+        } catch (e) {
+            console.error(`SHiP dispose error: ${e.message}`);
+            try {
+                if (conn.ws) conn.ws.terminate();
+            } catch (_) {
+                /* ignore */
+            }
+        }
+    }
+
+    _createReceiver(start_block) {
+        const sr = new StateReceiver({
+            startBlock: start_block,
+            endBlock: 0xffffffff,
+            mode: 0,
+            config: this.config,
+            irreversibleOnly: true
+        });
+
+        const _receivedBlock = sr.receivedBlock.bind(sr);
+        sr.receivedBlock = async (response, block, traces, deltas) => {
+            if (response && response.this_block && response.this_block.block_num) {
+                const block_num = response.this_block.block_num;
+                save_wax_block(block_num);
+                if (this.recovery) {
+                    this.recovery.noteProgress(block_num);
+                }
+            }
+            return _receivedBlock(response, block, traces, deltas);
+        };
+
+        // Heartbeat re-armed on each (re)connect when ABI arrives.
+        // Do not armGrace here: a socket that handshakes but never delivers blocks
+        // must still trip the stall timer (armGrace is applied after recovery actions).
+        sr.registerConnectedHandler((connection) => {
+            if (this.recovery) {
+                installWsHeartbeat(connection.ws, {
+                    pingMs: this.shipCfg.wsPingMs,
+                    error: console.error.bind(console),
+                });
+            }
+        });
+
+        sr.registerTraceHandler(this.trace_handler);
+        return sr;
+    }
+
+    async start(start_block) {
+        this._disposeReceiver();
+        this.sr = this._createReceiver(start_block);
+        this.sr.start();
+
+        if (!this.recovery) {
+            this.recovery = new ShipRecoveryController({
+                ...this.shipCfg,
+                forceClose: async () => this.forceCloseSocket(),
+                rebuild: async () => this.rebuildFromCursor(),
+                giveUp: async (info) => {
+                    console.error(
+                        `SHiP recovery exhausted (attempts=${info.recoveryAttempts}, ` +
+                            `last_block=${info.lastBlock || 'none'}, ws_readyState=${this._wsState()}). ` +
+                            `Exiting so PM2 can restart from saved cursor.`
+                    );
+                    process.exit(2);
+                },
+            });
+            this.recovery.start();
+        }
+    }
+
+    forceCloseSocket() {
+        const conn = this.sr && this.sr.connection;
+        if (!conn || !conn.ws) {
+            console.error('SHiP force-close: no active websocket; rebuilding instead');
+            return this.rebuildFromCursor();
+        }
+        console.error(
+            `SHiP force-close websocket (readyState=${conn.ws.readyState}) to trigger library reconnect`
+        );
+        try {
+            // Abnormal close → Connection.onClose reconnects (code !== 1000).
+            // currentArgs (start_block_num) is preserved across reconnect in the library.
+            conn.ws.terminate();
+        } catch (e) {
+            console.error(`SHiP force-close failed: ${e.message}`);
+            return this.rebuildFromCursor();
+        }
+    }
+
+    async rebuildFromCursor() {
+        let start_block = resolve_start_block();
+        if (start_block == null) {
+            try {
+                const info = await rpc.get_info();
+                start_block = info.head_block_num;
+            } catch (e) {
+                console.error(`SHiP rebuild: cannot resolve start block: ${e.message}`);
+                throw e;
+            }
+        }
+        console.error(
+            `SHiP rebuild StateReceiver from block ${start_block} ` +
+                `(saved=${load_wax_block()}, last_progress=${this.recovery ? this.recovery.lastProgressBlock : 'n/a'})`
+        );
+        this._disposeReceiver();
+        this.sr = this._createReceiver(start_block);
+        this.sr.start();
+    }
+}
 
 const start = async (config, start_block) => {
     const trace_handler = new TraceHandler({ config });
-
-    const sr = new StateReceiver({
-        startBlock: start_block,
-        endBlock: 0xffffffff,
-        mode: 0,
-        config,
-        irreversibleOnly: true
-    });
-
-    // Persist cursor on every block (before start() binds receivedBlock)
-    const _receivedBlock = sr.receivedBlock.bind(sr);
-    sr.receivedBlock = async function (response, block, traces, deltas) {
-        if (response && response.this_block && response.this_block.block_num) {
-            save_wax_block(response.this_block.block_num);
-        }
-        return _receivedBlock(response, block, traces, deltas);
-    };
-
-    sr.registerTraceHandler(trace_handler);
-    sr.start();
+    const shipCfg = shipConfigFromEnv();
+    const session = new ShipSession({ config, trace_handler, shipCfg });
+    await session.start(start_block);
 }
 
 const run = async (config) => {
@@ -247,7 +393,6 @@ const run = async (config) => {
     } else {
         const saved = load_wax_block();
         if (saved != null) {
-            // small rewind for reorg/overlap safety (mirrors oracle-eth -50)
             start_block = Math.max(1, saved - 50);
             console.log(`Starting from saved WAX block ${saved} (rewind to ${start_block})`);
         } else {

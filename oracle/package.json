@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node test/ship-recovery.test.js",
     "monitor": "node monitor-teleports.js",
     "monitor:once": "node monitor-teleports.js --once"
   },

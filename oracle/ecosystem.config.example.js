@@ -15,9 +15,18 @@ module.exports = {
             script: "./oracle-eos.js",
             node_args: ["--max-old-space-size=8192"],
             autorestart: true,
-            kill_timeout: 3600,
+            // Last-resort process.exit(2) after SHiP recovery is exhausted
+            kill_timeout: 10000,
             env: {
-                'CONFIG': './config'
+                'CONFIG': './config',
+                // No SHiP block progress for this long → recovery ladder
+                // (force-close → rebuild → … → exit 2). 0 disables.
+                'SHIP_STALL_MS': '120000',
+                'SHIP_STALL_CHECK_MS': '30000',
+                // Application-level WS ping; terminate socket if no pong (0 = disable)
+                'SHIP_WS_PING_MS': '30000',
+                // Max recovery attempts before process.exit(2) for PM2
+                'SHIP_MAX_RECOVERIES': '4',
             },
         },
         {

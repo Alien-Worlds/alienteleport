@@ -14,6 +14,15 @@ const { JsSignatureProvider } = require('eosjs/dist/eosjs-jssig');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const ethers = require('ethers');
+const {
+    claimed_topic,
+    teleport_topic,
+    decodeClaimedLog,
+    decodeTeleportLog,
+    buildClaimedAction,
+    buildReceivedAction,
+} = require('./lib/oracle/eth-events');
+const { loadEthBlock, saveEthBlock, nextWindow } = require('./lib/oracle/cursor');
 
 const config = require(process.env['CONFIG'] || './config');
 
@@ -27,8 +36,6 @@ const network = config.network || 'ETH'
 const blocks_file = `.oracle_${config.network}_block-${config.eth.oracleAccount}`;
 const chain_id = Number.parseInt(config.eth.chainId);
 const DEFAULT_BLOCKS_TO_WAIT = 5;
-const claimed_topic = '0xf20fc6923b8057dd0c3b606483fcaa038229bb36ebc35a0040e3eaa39cf97b17';
-const teleport_topic = '0x622824274e0937ee319b036740cd0887131781bc2032b47eac3e88a1be17f5d5';
 
 const sleep = async (ms) => {
     return new Promise(resolve => {
@@ -52,27 +59,8 @@ const await_confirmation = async (txid) => {
     });
 }
 
-const load_block = async () => {
-    let block_number = 'latest';
-    if (fs.existsSync(blocks_file)) {
-        const file_contents = await fs.readFileSync(blocks_file);
-        if (file_contents) {
-            block_number = parseInt(file_contents);
-            if (isNaN(block_number)) {
-                block_number = 'latest';
-            }
-            else {
-                // for fresh start go back 50 blocks
-                block_number -= 50;
-            }
-        }
-    }
-
-    return block_number;
-}
-const save_block = async (block_num) => {
-    await fs.writeFileSync(blocks_file, block_num.toString());
-}
+const load_block = async () => loadEthBlock(blocks_file);
+const save_block = async (block_num) => saveEthBlock(blocks_file, block_num);
 
 const process_claimed = async (from_block, to_block) => {
     return new Promise(async (resolve, reject) => {
@@ -88,27 +76,9 @@ const process_claimed = async (from_block, to_block) => {
             // console.log(res);
             if (res.length) {
                 for (let r = 0; r < res.length; r++) {
-                    const data = await ethers.utils.defaultAbiCoder.decode(['uint64', 'address', 'uint'], res[r].data);
-
-                    // console.log(res[r], data, data[1].toString());
-                    const id = data[0].toNumber();
-                    const to_eth = data[1].replace('0x', '') + '000000000000000000000000';
-                    const quantity = (data[2].toNumber() / Math.pow(10, config.precision)).toFixed(config.precision) + ' ' + config.symbol;
-                    const actions = [];
-                    actions.push({
-                        account: config.eos.teleportContract,
-                        name: 'claimed',
-                        authorization: [{
-                            actor: config.eos.oracleAccount,
-                            permission: config.eos.oraclePermission || 'active'
-                        }],
-                        data: {
-                            oracle_name: config.eos.oracleAccount,
-                            id,
-                            to_eth,
-                            quantity
-                        }
-                    });
+                    const claimed = decodeClaimedLog(res[r], config);
+                    const { id, to_eth, quantity } = claimed;
+                    const actions = buildClaimedAction(config, claimed);
                     // console.log(actions, res[r].transactionHash);
 
                     await_confirmation(res[r].transactionHash).then(async () => {
@@ -157,38 +127,12 @@ const process_teleported = async (from_block, to_block) => {
             // console.log(res);
             if (res.length) {
                 for (let r = 0; r < res.length; r++) {
-                    const data = ethers.utils.defaultAbiCoder.decode(['string', 'uint', 'uint'], res[r].data);
-
-                    // console.log(res[r], data, data[1].toString())
-
-                    const tokens = data[1].toNumber();
-                    if (tokens <= 0) {
-                        // console.error(data);
+                    const teleport = decodeTeleportLog(res[r], config);
+                    if (teleport === null) {
                         console.error('Tokens are less than or equal to 0');
                         continue;
                     }
-                    const to = data[0];
-                    const amount = (tokens / Math.pow(10, config.precision)).toFixed(config.precision);
-                    const quantity = `${amount} ${config.symbol}`
-                    const txid = res[r].transactionHash.replace(/^0x/, '');
-
-                    const actions = [];
-                    actions.push({
-                        account: config.eos.teleportContract,
-                        name: 'received',
-                        authorization: [{
-                            actor: config.eos.oracleAccount,
-                            permission: config.eos.oraclePermission || 'active'
-                        }],
-                        data: {
-                            oracle_name: config.eos.oracleAccount,
-                            to,
-                            ref: txid,
-                            quantity,
-                            chain_id,
-                            confirmed: true
-                        }
-                    });
+                    const actions = buildReceivedAction(config, teleport, chain_id);
                     // console.log(actions);
 
                     await_confirmation(res[r].transactionHash).then(async () => {
@@ -241,9 +185,9 @@ const run = async (from_block = 'latest') => {
                 from_block = latest_block - 100;
                 // console.log(block, from_block)
             }
-            let to_block = Math.min(from_block + 100, latest_block)
+            const { to_block, up_to_date } = nextWindow(from_block, latest_block);
 
-            if (from_block >= latest_block) {
+            if (up_to_date) {
                 console.log(`Up to date at block ${to_block}`);
                 await sleep(10000);
             }

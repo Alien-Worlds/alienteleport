@@ -33,6 +33,10 @@ Oracle accounts must be registered using the `regoracle` (Antelope) and `regOrac
 
 Successfully registered oracles can then call the received function on each contract when they see a transaction on the opposing chain. The oracles scripts and smart contracts on each chain verify the data is correct automatically. Other than configuring oracle signing keys and API endpoint details there is no code or further configuration required.
 
+### Node.js version
+
+Oracles must run **Node.js 24.22.1 or later** (`oracle/.tool-versions` pins 24.22.2). Earlier releases are affected by the October 2026 Node.js security fixes, including a Brotli decoder remote code execution flaw and TLS/DNS hostname verification bypasses. Node 20 is end of life and receives no fixes. Run `yarn test` in `oracle/` to check that the running Node and the pinned version meet the minimum.
+
 ### Configuration
 
 1. Copy config-example.js to config.js

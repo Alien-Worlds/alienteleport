@@ -4,14 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test \"test/**/*.test.js\"",
     "monitor": "node monitor-teleports.js",
     "monitor:once": "node monitor-teleports.js --once"
   },
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": ">=16"
+    "node": ">=24.22.1"
   },
   "dependencies": {
     "@eosdacio/eosio-statereceiver": "^1.1.1",

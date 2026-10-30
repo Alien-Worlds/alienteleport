@@ -16,10 +16,11 @@ Run commands from each subdirectory; install with `yarn` (or `npm i`) per packag
   - `yarn stop` to tear down the Lamington node
   - Run a single test file: `npx lamington test -DIS_DEV contracts/teleporteos/teleporteos.test.ts`
 - `smart_contracts/evm/teleporteth/contracts/TeleportToken.sol` — standalone Solidity source; **no build tooling is checked in**. If you need to compile/deploy it, set up Hardhat/Foundry yourself or ask the user which toolchain they use.
-- `oracle/` — Node.js oracle daemons. No test suite. Run with a config file:
+- `oracle/` — Node.js oracle daemons (Node >= 24.22.1). Run with a config file:
   - `CONFIG=./config.js node oracle-eos.js`
   - `CONFIG=./config.js node oracle-eth.js`
   - Copy `config-example.js` → `config.js` first. `ecosystem.config.example.js` is a PM2 template.
+  - Pure logic (signing, EVM log decoding, action building, cursors, trace matching) lives in `oracle/lib/oracle/`; the daemons wire it to I/O. `oracle/test/` pins it with golden values from the pre-extraction code: a failing golden test means the signed payload or submitted actions changed. `yarn test` runs them.
   - Helper scripts: `incomplete-eos.js`, `incomplete-eth.js` (find teleports missing signatures), `txdispatch.js`, `check-eth.js`, `eth_abi.js`.
   - Note: `oracle-eth.ts` exists alongside `oracle-eth.js` — the `.js` file is the one that's run; treat the `.ts` as a partial/in-progress port unless told otherwise.
 - `scripts/` — one-off TS utilities (`teleport.ts`, `get_sign_data.ts`). Run via `ts-node` / `tsx`.

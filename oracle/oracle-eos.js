@@ -19,7 +19,9 @@ const { TextDecoder, TextEncoder } = require('text-encoding');
 const { fork } = require('child_process');
 
 const Web3 = require('web3');
-const ethUtil = require('ethereumjs-util');
+const { signTeleport, buildSignAction } = require('./lib/oracle/sign');
+const { createWaxCursor, rewindWaxStart } = require('./lib/oracle/cursor');
+const { findLogTeleportActs } = require('./lib/oracle/traces');
 
 // @eosdacio/eosio-statereceiver hardcodes fetch_block:true, which deserializes every
 // signed_block (including WA/WebAuthn tx signatures). This oracle only uses traces for
@@ -58,27 +60,7 @@ let tx_dispatcher = null;
 const waxNetwork = config.network || 'ETH';
 const blocks_file = `.oracle_WAX_${waxNetwork}_block-${config.eos.oracleAccount}`;
 
-const load_wax_block = () => {
-    try {
-        if (!fs.existsSync(blocks_file)) return null;
-        const n = parseInt(fs.readFileSync(blocks_file, 'utf8').trim(), 10);
-        return Number.isFinite(n) && !isNaN(n) ? n : null;
-    } catch (_) {
-        return null;
-    }
-};
-
-let _lastSavedWaxBlock = 0;
-const save_wax_block = (block_num) => {
-    // Persist every block for accurate lag; skip no-ops
-    if (!block_num || block_num === _lastSavedWaxBlock) return;
-    _lastSavedWaxBlock = block_num;
-    try {
-        fs.writeFileSync(blocks_file, String(block_num));
-    } catch (e) {
-        console.error(`Failed to save WAX cursor ${block_num}: ${e.message}`);
-    }
-};
+const { load: load_wax_block, save: save_wax_block } = createWaxCursor(blocks_file);
 
 // const ethAbi = require(`./eth_abi`);
 
@@ -129,30 +111,11 @@ class TraceHandler {
 
 
             // sign the transaction and send to the eos chain
-            const data_buf = Buffer.from(data_serialized);
-            const msg_hash = ethUtil.keccak(data_buf);
+            const { msgHash: msg_hash, signature } = signTeleport(data_serialized, this.config.eth.privateKey);
             console.log(msg_hash.toString('hex'));
-            // console.log(this.config.eth.privateKey);
-            const pk = Buffer.from(this.config.eth.privateKey, "hex");
-            const sig = ethUtil.ecsign(msg_hash, pk);
-            // console.log(pk, sig);
-
-            const signature = ethUtil.toRpcSig(sig.v, sig.r, sig.s);
             console.log(`TeleportId: ${data.id}; Created signature ${signature}`);
 
-            const actions = [{
-                account: config.eos.teleportContract,
-                name: 'sign',
-                authorization: [{
-                    actor: config.eos.oracleAccount,
-                    permission: config.eos.oraclePermission || 'active'
-                }],
-                data: {
-                    oracle_name: config.eos.oracleAccount,
-                    id: data.id,
-                    signature
-                }
-            }];
+            const actions = buildSignAction(config, data.id, signature);
 
             console.log('Sending signature');
 
@@ -184,25 +147,10 @@ class TraceHandler {
     async processTrace(block_num, traces, block_timestamp) {
         // console.log(block_num);
 
-        for (const trace of traces) {
-            switch (trace[0]) {
-                case 'transaction_trace_v0':
-                    const trx = trace[1];
-                    // console.log(trx)
-                    for (let action of trx.action_traces) {
-                        //console.log(action)
-                        switch (action[0]) {
-                            case 'action_trace_v0':
-                            case 'action_trace_v1':
-                                if (action[1].act.account === this.config.eos.teleportContract && action[1].act.name === 'logteleport') {
-                                    const action_deser = await eos_api.deserializeActions([action[1].act]);
-                                    console.log(`TeleportId: ${action_deser[0].data.id}, Sending ${action_deser[0].data.quantity} from ${action_deser[0].data.from} to ${action_deser[0].data.eth_address}`);
-                                    this.sendSignature(action_deser[0].data, action[1].act.data);
-                                }
-                                break;
-                        }
-                    }
-            }
+        for (const act of findLogTeleportActs(traces, this.config.eos.teleportContract)) {
+            const action_deser = await eos_api.deserializeActions([act]);
+            console.log(`TeleportId: ${action_deser[0].data.id}, Sending ${action_deser[0].data.quantity} from ${action_deser[0].data.from} to ${action_deser[0].data.eth_address}`);
+            this.sendSignature(action_deser[0].data, act.data);
         }
     }
 }
@@ -248,7 +196,7 @@ const run = async (config) => {
         const saved = load_wax_block();
         if (saved != null) {
             // small rewind for reorg/overlap safety (mirrors oracle-eth -50)
-            start_block = Math.max(1, saved - 50);
+            start_block = rewindWaxStart(saved);
             console.log(`Starting from saved WAX block ${saved} (rewind to ${start_block})`);
         } else {
             const info = await rpc.get_info();

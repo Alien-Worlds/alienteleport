@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Alien Teleport is a bridge for fungible tokens between an Antelope chain (WAX) and EVM chains (Ethereum, BSC, …). It is a multi-package monorepo containing the two on-chain contracts, the off-chain oracle scripts that link them, and a Quasar/Vue UI. Each subdirectory is its own independent package — there is no root build, and the root `package.json` only pins a couple of shared type deps.
+Alien Teleport is a bridge for fungible tokens between an Antelope chain (WAX) and EVM chains (Ethereum, BSC, …). It is a multi-package monorepo containing the two on-chain contracts and the off-chain oracle scripts that link them. Each subdirectory is its own independent package — there is no root build, and the root `package.json` only pins a couple of shared type deps.
 
 ## Subpackages and commands
 
@@ -22,10 +22,6 @@ Run commands from each subdirectory; install with `yarn` (or `npm i`) per packag
   - Copy `config-example.js` → `config.js` first. `ecosystem.config.example.js` is a PM2 template.
   - Helper scripts: `incomplete-eos.js`, `incomplete-eth.js` (find teleports missing signatures), `txdispatch.js`, `check-eth.js`, `eth_abi.js`.
   - Note: `oracle-eth.ts` exists alongside `oracle-eth.js` — the `.js` file is the one that's run; treat the `.ts` as a partial/in-progress port unless told otherwise.
-- `ui/` — Quasar v1 + Vue 2 wallet UI.
-  - `yarn build` → `quasar build`
-  - `yarn lint` → ESLint over `.js`/`.vue`
-  - No test suite (`yarn test` is a no-op).
 - `scripts/` — one-off TS utilities (`teleport.ts`, `get_sign_data.ts`). Run via `ts-node` / `tsx`.
 
 ## Architecture

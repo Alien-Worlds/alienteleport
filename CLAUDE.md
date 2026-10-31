@@ -16,7 +16,7 @@ Run commands from each subdirectory; install with `yarn` (or `npm i`) per packag
   - `yarn stop` to tear down the Lamington node
   - Run a single test file: `npx lamington test -DIS_DEV contracts/teleporteos/teleporteos.test.ts`
 - `smart_contracts/evm/teleporteth/contracts/TeleportToken.sol` — standalone Solidity source; **no build tooling is checked in**. If you need to compile/deploy it, set up Hardhat/Foundry yourself or ask the user which toolchain they use.
-- `oracle/` — Node.js oracle daemons (Node >= 24.22.1). Run with a config file:
+- `oracle/` — Node.js oracle daemons (Node ^24.22.1). Run with a config file:
   - `CONFIG=./config.js node oracle-eos.js`
   - `CONFIG=./config.js node oracle-eth.js`
   - Copy `config-example.js` → `config.js` first. `ecosystem.config.example.js` is a PM2 template.

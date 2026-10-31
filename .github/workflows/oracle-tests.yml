@@ -1,0 +1,45 @@
+name: Oracle tests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'oracle/**'
+      - '.github/workflows/oracle-tests.yml'
+  pull_request:
+    paths:
+      - 'oracle/**'
+      - '.github/workflows/oracle-tests.yml'
+
+# Read-only token; fork PRs get no secrets. Do not switch to pull_request_target.
+permissions:
+  contents: read
+
+concurrency:
+  group: oracle-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: oracle
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Node version comes from oracle/.tool-versions, the same pin used locally.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: oracle/.tool-versions
+          cache: yarn
+          cache-dependency-path: oracle/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --ignore-scripts
+
+      - name: Run tests
+        run: yarn test

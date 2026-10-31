@@ -41,5 +41,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile --ignore-scripts
 
-      - name: Run tests
-        run: yarn test
+      # Prints the coverage table and fails if lib/ drops below the thresholds in package.json.
+      - name: Run tests with coverage
+        run: yarn test:coverage

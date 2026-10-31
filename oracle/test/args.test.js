@@ -151,3 +151,55 @@ test('bad config exits with code 3 and a Config error message', () => {
     assert.match(message, pattern);
   }
 });
+
+test('remaining flags set their values', () => {
+  const a = parse([
+    '--sig-threshold', '4',
+    '--receipt-threshold', '6',
+    '--min-age', '30',
+    '--historical-age', '7200',
+    '--pages', '9',
+    '--bind', '127.0.0.1',
+    '--hyperion', 'https://h.example',
+  ]);
+  assert.strictEqual(a.sigThreshold, 4);
+  assert.strictEqual(a.receiptThreshold, 6);
+  assert.strictEqual(a.minAgeSec, 30);
+  assert.strictEqual(a.historicalAgeSec, 7200);
+  assert.strictEqual(a.pages, 9);
+  assert.strictEqual(a.statusBind, '127.0.0.1');
+  assert.strictEqual(a.hyperion, 'https://h.example');
+});
+
+test('hyperion defaults to empty when neither env nor flag is given', () => {
+  assert.strictEqual(parse().hyperion, '');
+});
+
+test('--help prints usage and exits 0', () => {
+  const realExit = process.exit;
+  const realLog = console.log;
+  const realError = console.error;
+  let code;
+  let out = '';
+  // parseArgs wraps everything in try/catch, so only the first exit call is the real one.
+  process.exit = (c) => {
+    if (code === undefined) code = c;
+    throw new Error('__exit__');
+  };
+  console.log = (m) => {
+    out += m;
+  };
+  console.error = () => {};
+  try {
+    parse(['--help']);
+  } catch (e) {
+    if (e.message !== '__exit__') throw e;
+  } finally {
+    process.exit = realExit;
+    console.log = realLog;
+    console.error = realError;
+  }
+  assert.strictEqual(code, 0);
+  assert.match(out, /Usage: CONFIG=/);
+  assert.match(out, /--sig-threshold/);
+});

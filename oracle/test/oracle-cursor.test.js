@@ -77,3 +77,8 @@ test('rewindWaxStart rewinds by 50 and never goes below 1', () => {
   assert.strictEqual(rewindWaxStart(30), 1);
   assert.strictEqual(rewindWaxStart(1), 1);
 });
+
+test('WAX cursor: an unreadable path loads as null instead of throwing', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oracle-cursor-dir-'));
+  assert.strictEqual(createWaxCursor(dir).load(), null);
+});

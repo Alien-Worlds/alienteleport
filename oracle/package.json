@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"lib/**\" --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=90 \"test/**/*.test.js\"",
     "monitor": "node monitor-teleports.js",
     "monitor:once": "node monitor-teleports.js --once"
   },

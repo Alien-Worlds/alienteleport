@@ -35,7 +35,7 @@ Successfully registered oracles can then call the received function on each cont
 
 ### Node.js version
 
-Oracles must run **Node.js 24.22.1 or later** (`oracle/.tool-versions` pins 24.22.2). Earlier releases are affected by the October 2026 Node.js security fixes, including a Brotli decoder remote code execution flaw and TLS/DNS hostname verification bypasses. Node 20 is end of life and receives no fixes. Run `yarn test` in `oracle/` to check that the running Node and the pinned version meet the minimum.
+Oracles must run **Node.js 24.22.1 or later within the 24 line** (`^24.22.1`; `oracle/.tool-versions` pins 24.22.2). Later majors are not accepted until they have been checked against a security release: a higher major can still predate the fixes (the October release patched 26.x only in 26.12.1). Earlier 24.x releases are affected by the October 2026 Node.js security fixes, including a Brotli decoder remote code execution flaw and TLS/DNS hostname verification bypasses. Node 20 is end of life and receives no fixes. Run `yarn test` in `oracle/` to check that the running Node and the pinned version meet the minimum.
 
 ### Configuration
 
